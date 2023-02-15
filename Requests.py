@@ -1,5 +1,5 @@
-from API  import API_Talkdesk
-from API  import API_Genesys
+from API_Talkdesk import API_Talkdesk
+from API_Genesys import API_Genesys
 from datetime import datetime, timedelta
 
 class Request:

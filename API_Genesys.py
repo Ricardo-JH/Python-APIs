@@ -1,4 +1,3 @@
-import base64
 import pandas as pd
 import requests
 import time

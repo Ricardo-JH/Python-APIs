@@ -1,8 +1,6 @@
-import base64
 import pandas as pd
 import requests
 import time
-from datetime import datetime, timedelta
 import SQLConnection
 from API_parameters import *
 from API import API
