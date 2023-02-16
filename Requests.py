@@ -14,6 +14,8 @@ class Request:
             self.API = API_Talkdesk(self.API_domain)
         elif self.API_domain == 'ultra':
             self.API = API_Genesys(self.API_domain)
+        elif self.API_domain == 'kustomer':
+            self.API = API_Genesys(self.API_domain)
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):

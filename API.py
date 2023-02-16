@@ -17,6 +17,7 @@ class API:
         self.report_types = None
         self.access_token = None
         self.access_token_start = None
+        self.API_key = None
         self.set_attributes()
 
 
@@ -43,6 +44,12 @@ class API:
             self.SQLschema = ultra_dic['SQLschema']
             self.client_id = ultra_dic['clientID']
             self.client_secret = ultra_dic['client_secret']
+            self.report_types = ultra_dic['report_types']
+        
+        if self.API_domain == 'kustomer':
+            self.API_key = kustomer_dic['API_key']
+            self.base_API = ultra_dic['baseAPI']
+            self.SQLschema = ultra_dic['SQLschema']
             self.report_types = ultra_dic['report_types']
 
 
@@ -72,8 +79,6 @@ class API:
             if elapsed_time > 500:
                 self.access_token_start = None
                 self.authorize()
-            
-        
 
     
     def load_data(self, API, SQL_table, report_type, start_date, end_date):
