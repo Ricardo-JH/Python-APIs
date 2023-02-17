@@ -10,47 +10,17 @@ from API import API
 class API_Kustomer(API):
     def __init__(self, API_domain):
         super().__init__(API_domain)
-        
-
-    def execute_report(self, report_type, from_date, to_date):
-
-        isValidResponse = False
-        
-        url = f'{self.base_API}/{report_type}/details/jobs'
-        url = url.replace('users_presence', 'analytics/users')
-        url = url.replace('users_routingStatus', 'analytics/users')
-        
-        payload = {"format": "json",
-                    "Name": "TestReport",
-                    "interval": f"{from_date}/{to_date}"
-        }
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "Authorization": f"Bearer {self.access_token}"
-        }
-
-        start_time = time.time()
-        
-        while not isValidResponse:
-            try:
-                response = requests.post(url, json=payload, headers=headers).json()
-                time.sleep(0.5)
-                job_ID = response['jobId']
-                isValidResponse = True
-                
-            except:
-                time.sleep(0.5)
-        
-        elapsedTime = time.time() - start_time
-        print(f'Time to Execute Report: {elapsedTime} Sec')
-        
-        return job_ID
-        
+       
 
     def get_dataReport(self, report_type, job_ID):
         df = pd.DataFrame()
         isValidResponse = False
+
+        page = 1
+        params = f'?page={page}&pageSize=100' #&sort=desc'
+        
+        url = f'{self.base_API}/{report_type}'
+
         cursor = 'init'
 
         url = f'{self.base_API}/{report_type}/details/jobs/{job_ID}'
