@@ -1,12 +1,13 @@
-from Requests import Request
+from API import API
 import time
 
 
-ultra = Request('ultra')
+ultra = API('ultra')
 
-# ultra.load_schedules()
-ultra.load_data('All')
+# ultra.API.load_users()
+# ultra.API.load_schedules_activityCodes()
+# ultra.API.load_data('All')
 
 # while True:
-    # root.load_data('All')
+    # root.API.load_data('All')
     # time.sleep(5 * 60)

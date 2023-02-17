@@ -1,21 +1,199 @@
+from datetime import datetime, timedelta
+from API_parameters import ultra_dic
+import SQLConnection
 import pandas as pd
 import requests
+import base64
 import time
-from datetime import datetime, timedelta
-import SQLConnection
-from API_parameters import *
-from API import API
 
 
-class API_Genesys(API):
+class API_Genesys():
     def __init__(self, API_domain):
-        super().__init__(API_domain)
-        self.responses_dict = {#SQL_table : DataFrame_column
-                                'users_presence': 'userDetails',
-                                'users_routingStatus': 'userDetails',
-                                'users': 'entities',
-                                'conversations': 'conversations' 
-}
+        self.API_domain = API_domain
+        self.login_API = None
+        self.base_API = None
+        self.client_id = None
+        self.client_secret = None
+        self.SQLschema = None
+        self.report_types = None
+        self.access_token = None
+        self.access_token_startTime = None
+        self.set_attributes()
+    
+
+    def set_attributes(self):
+        if self.API_domain == 'ultra':
+            self.login_API = ultra_dic['loginAPI']
+            self.base_API = ultra_dic['baseAPI']
+            self.SQLschema = ultra_dic['SQLschema']
+            self.client_id = ultra_dic['clientID']
+            self.client_secret = ultra_dic['client_secret']
+            self.report_types = ultra_dic['report_types']
+
+
+    def authorize(self):    
+        encodedData = base64.b64encode(bytes(f"{self.client_id}:{self.client_secret}", "ISO-8859-1")).decode("ascii")
+
+        payload = "grant_type=client_credentials"
+
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Basic {encodedData}",
+        "content-type": "application/x-www-form-urlencoded"
+        }
+        
+        if self.access_token_startTime == None:
+            self.access_token_startTime = time.time()
+            #response = requests.post(self.login_API, data=payload, headers=headers)
+            #access_token = response.json()['access_token']
+            #self.access_token = access_token
+            self.access_token = 'X0lylVPiT3M4V6VLew3zcNd3Js2WFJ7P138-0pOJTnqfyyu7-jBea2hhjYBGnNTKCt7CyIybY7FlaxQDxKZ1wQ'
+
+        else:
+            access_token_end = time.time()
+            elapsed_time = access_token_end - self.access_token_startTime
+            if elapsed_time > 500:
+                self.access_token_startTime = None
+                self.authorize()
+
+
+    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
+        SQL_tables = []
+
+        if start_time == None:
+            self.SQLschema = self.SQLschema + 'Temp'
+            end_time = datetime.utcnow() + timedelta(minutes=-1)
+            start_time = end_time + timedelta(days=-days)
+        elif type(start_time) == str:
+            start_time = datetime.fromisoformat(start_time)
+            end_time = datetime.fromisoformat(end_time)
+
+        if tables == None:
+            print('No tables introduced')
+            return
+        elif tables == 'All':
+            report_types = self.report_types
+        else:
+            report_types = tables
+
+        for table in report_types:
+            SQL_tables.append(f'[{self.SQLschema}].[{table}]')
+
+        for i in range(len(SQL_tables)):
+            now = datetime.utcnow()
+            
+            aux_start_time = start_time
+
+            aux_time = start_time + timedelta(days=1)
+
+            self.authorize()
+            
+            if 'Temp' in SQL_tables[i]:
+                SQLConnection.truncate(SQL_tables[i], self.API_domain)
+                hours = -8
+            else:
+                hours = 0
+
+            while aux_time <= end_time and aux_time <= now:
+                
+                self.authorize()
+                
+                print(f'\n{SQL_tables[i]} {self.API_domain}')
+                print(f'Load until: {end_time + timedelta(hours=hours)}')
+                print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
+                print(self.access_token[-10:-1])
+                
+                job = self.execute_report(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
+                df = self.get_dataReport(report_types[i], job)
+                self.delete_report(report_types[i], job)
+                SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
+
+                aux_start_time = aux_start_time + timedelta(days=1)
+                aux_time = aux_start_time + timedelta(days=1)
+
+        print('Finish loading Data\n')
+
+
+    def load_schedules(self, op=1):
+        
+        # self.API.load_schedules_activityCodes
+        today = datetime.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+
+        for i in range(op):
+            
+            df = pd.DataFrame()
+            SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
+            
+            if op > 1:
+                SQL_Table = SQL_Table.replace('Temp', '')
+            else:
+                SQLConnection.truncate(SQL_Table, self.API_domain)
+            
+            aux_start_of_week = start_of_week
+            LOB_list, schedule_id = self.get_LOB(aux_start_of_week)
+            
+            j = 1
+            
+            for LOB in LOB_list:
+                print(j)
+                url = f'{self.base_API}/workforcemanagement/managementunits/{LOB}/weeks/{aux_start_of_week}/schedules/{schedule_id}'
+
+                self.authorize()
+            
+                headers = {
+                "accept": "application/json",
+                "Authorization": f"Bearer {self.access_token}"
+                }
+                
+                start_time = time.time()
+                isValidResponse = False
+
+                while not isValidResponse:
+                    try:
+                        response = requests.get(url, headers=headers).json()
+                        
+                        if pd.DataFrame(response).empty:
+                            break
+
+                        time.sleep(0.5)
+                        
+                        df_schedules = pd.DataFrame(response['result'])[['id', 'weekDate', 'description', 'published', 'userSchedules']].fillna('').iloc[5:]
+                        # print(df_schedules)
+                        df_schedules = df_schedules.reset_index().rename(columns={'index': 'userId', 'id': 'scheduleId'})
+                        
+                        for schedule_i in range(len(df_schedules.axes[0])):
+                            df_schedule_info = df_schedules[['userId', 'scheduleId', 'weekDate', 'description', 'published']].iloc[schedule_i: schedule_i + 1].reset_index(drop=True)
+                            shifts = df_schedules['userSchedules'].iloc[schedule_i]['shifts']
+
+                            for shift in shifts:
+                                df_shift = pd.DataFrame(shift)
+                                df_schedule_info['referenceDate'] = df_shift['startDate']
+                                df_activities = df_shift['activities']
+
+                                for activity_i in range(len(df_activities.axes[0])):
+                                    activity = df_activities.iloc[activity_i]
+                                    df_activity = pd.DataFrame(activity, index=[0])[['activityCodeId', 'startDate', 'lengthInMinutes', 'countsAsPaidTime']]
+                                    result = pd.concat([df_schedule_info, df_activity], axis=1, join='inner')
+                                    df = pd.concat([result, df.loc[:]]).reset_index(drop=True).fillna('')
+                                    # print(df)
+                    
+                        # print(df)
+                        
+                        isValidResponse = True
+                    except:
+                        time.sleep(0.5)
+                        elapsedTime = time.time() - start_time
+
+                elapsedTime = time.time() - start_time
+                print(self.access_token[-10:-1])
+                print(f'Time to get Schedule {LOB}: {elapsedTime} Sec')
+                j = j + 1
+            SQLConnection.insert(df, SQL_Table, self.API_domain)
+            print('\nFinish Loading Schedules Data')
+            
+            aux_start_of_week = aux_start_of_week - timedelta(days=7)
+
 
     def execute_report(self, report_type, from_date, to_date):
 
@@ -87,8 +265,7 @@ class API_Genesys(API):
                     
                     try:
                         response = requests.get(url_iter, headers=headers).json()
-                        response_field = self.responses_dict[report_type]
-                        df_response = pd.DataFrame(response[response_field]).fillna('')
+                        df_response = pd.DataFrame(response['userDetails']).fillna('')
                     except:
                         print(f"Couldn't get results ob Job: {url_iter}")
 
@@ -152,7 +329,7 @@ class API_Genesys(API):
     def load_users(self):
         
         url = f'{self.base_API}/users'
-        next_url = f'{self.base_API}/users'
+        next_url = f'{self.base_API}/users?pageSize=500'
         SQL_Table = f'[{self.SQLschema}].[users]'
         last_page = False
 
@@ -241,13 +418,14 @@ class API_Genesys(API):
 
         elapsedTime = time.time() - start_time
         print(self.access_token[-10:-1])
-        print(f'Time to get Activity Codes: {elapsedTime} Sec')
+        print(f'Time to update Activity Codes: {elapsedTime} Sec')
                
         print('\nFinish updating Activity Codes')
 
 
     def get_LOB(self, week):
         LOB_list = []
+
         url = f'{self.base_API}/workforcemanagement/businessunits/84b495aa-7cdf-4921-b848-913e5f5f0506/weeks/{week}/schedules'
         self.authorize()
 
@@ -255,13 +433,15 @@ class API_Genesys(API):
         "accept": "application/json",
         "Authorization": f"Bearer {self.access_token}"
         }
-        
+
         start_time = time.time()
         isValidResponse = False
 
         while not isValidResponse:
             try:
-                response = requests.get(url, headers=headers).json()['entities']
+                response = requests.get(url, headers=headers).json()
+
+                response = response['entities']
                 time.sleep(0.5)
                 schedule_id = pd.DataFrame(response)['id'].iloc[0]
 
@@ -282,74 +462,5 @@ class API_Genesys(API):
 
         return LOB_list, schedule_id
 
-
-    def load_schedules(self, week, op):
         
-        df = pd.DataFrame()
-        SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
-        
-        if op > 1:
-            SQL_Table = SQL_Table.replace('Temp', '')
-        else:
-            SQLConnection.truncate(SQL_Table, self.API_domain)
-
-        LOB_list, schedule_id = self.get_LOB(week)
-        i = 1
-        for LOB in LOB_list:
-            print(i)
-            url = f'{self.base_API}/workforcemanagement/managementunits/{LOB}/weeks/{week}/schedules/{schedule_id}'
-
-            self.authorize()
-        
-            headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {self.access_token}"
-            }
-            
-            start_time = time.time()
-            isValidResponse = False
-
-            while not isValidResponse:
-                try:
-                    
-                    response = requests.get(url, headers=headers).json()
-                    
-                    if pd.DataFrame(response).empty:
-                        break
-
-                    time.sleep(0.5)
-                    
-                    df_schedules = pd.DataFrame(response['result'])[['id', 'weekDate', 'description', 'published', 'userSchedules']].fillna('').iloc[5:]
-                    # print(df_schedules)
-                    df_schedules = df_schedules.reset_index().rename(columns={'index': 'userId', 'id': 'scheduleId'})
-                    
-                    for schedule_i in range(len(df_schedules.axes[0])):
-                        df_schedule_info = df_schedules[['userId', 'scheduleId', 'weekDate', 'description', 'published']].iloc[schedule_i: schedule_i + 1].reset_index(drop=True)
-                        shifts = df_schedules['userSchedules'].iloc[schedule_i]['shifts']
-
-                        for shift in shifts:
-                            df_shift = pd.DataFrame(shift)
-                            df_schedule_info['referenceDate'] = df_shift['startDate']
-                            df_activities = df_shift['activities']
-
-                            for activity_i in range(len(df_activities.axes[0])):
-                                activity = df_activities.iloc[activity_i]
-                                df_activity = pd.DataFrame(activity, index=[0])[['activityCodeId', 'startDate', 'lengthInMinutes', 'countsAsPaidTime']]
-                                result = pd.concat([df_schedule_info, df_activity], axis=1, join='inner')
-                                df = pd.concat([result, df.loc[:]]).reset_index(drop=True).fillna('')
-                                # print(df)
-                
-                    # print(df)
-                    
-                    isValidResponse = True
-                except:
-                    time.sleep(0.5)
-                    elapsedTime = time.time() - start_time
-
-            elapsedTime = time.time() - start_time
-            print(self.access_token[-10:-1])
-            print(f'Time to get Schedule {LOB}: {elapsedTime} Sec')
-            i = i + 1
-        SQLConnection.insert(df, SQL_Table, self.API_domain)
-        print('\nFinish Loading Schedules Data')
         

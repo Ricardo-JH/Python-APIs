@@ -3,14 +3,78 @@ import requests
 import time
 from datetime import datetime, timedelta
 import SQLConnection
-from API_parameters import *
-from API import API
+from API_parameters import kustomer_dic
 
 
-class API_Kustomer(API):
+class API_Kustomer():
     def __init__(self, API_domain):
-        super().__init__(API_domain)
-       
+        self.API_domain = API_domain
+        self.set_attributes()
+    
+
+    def set_attributes(self):
+        if self.API_domain == 'kustomer':
+            self.API_key = kustomer_dic['API_key']
+            self.base_API = kustomer_dic['baseAPI']
+            self.SQLschema = kustomer_dic['SQLschema']
+            self.report_types = kustomer_dic['report_types']
+
+
+    def authorize(self):    
+        encodedData = base64.b64encode(bytes(f"{self.client_id}:{self.client_secret}", "ISO-8859-1")).decode("ascii")
+
+        payload = "grant_type=client_credentials"
+
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Basic {encodedData}",
+        "content-type": "application/x-www-form-urlencoded"
+        }
+
+        if self.API_domain == 'ultra':
+            self.access_token = 'EjNwULC3ithDWT2mSaom9akk90c1uVskozCETALHySP5H4gcKnloj8okkLbfTI_ypvFFibdz9TerBU4wL2LYnw'
+        
+        elif self.access_token_start == None:
+            self.access_token_start = time.time()
+            response = requests.post(self.login_API, data=payload, headers=headers)
+            access_token = response.json()['access_token']
+            self.access_token = access_token
+
+        else:
+            access_token_end = time.time()
+            elapsed_time = access_token_end - self.access_token_start
+            if elapsed_time > 500:
+                self.access_token_start = None
+                self.authorize()
+                
+
+    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
+        SQL_tables = []
+        schema = self.API.SQLschema
+
+        if start_time == None:
+            temporal = True
+            end_time = datetime.utcnow() + timedelta(minutes=-1)
+            start_time = end_time + timedelta(days=-days)
+        else:
+            temporal = False
+
+        if temporal:
+            schema = schema + 'Temp'
+        
+        if tables == 'All':
+            report_types = self.API.report_types
+        else:
+            report_types = tables
+
+        for table in report_types:
+            SQL_tables.append(f'[{schema}].[{table}]')
+
+        for i in range(len(SQL_tables)):
+            self.API.load_data(self.API, SQL_tables[i], report_types[i], start_time, end_time)
+
+        print('Finish loading Data\n')
+
 
     def get_dataReport(self, report_type, job_ID):
         df = pd.DataFrame()

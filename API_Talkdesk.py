@@ -1,14 +1,125 @@
+from API_parameters import therabody_dic, root_dic
+from datetime import datetime, timedelta
+import SQLConnection
 import pandas as pd
 import requests
+import base64
 import time
-import SQLConnection
-from API_parameters import *
-from API import API
 
 
-class API_Talkdesk(API):
+class API_Talkdesk:
     def __init__(self, API_domain):
-        super().__init__(API_domain)
+        self.API_domain = API_domain
+        self.login_API = None
+        self.base_API = None
+        self.client_id = None
+        self.client_secret = None
+        self.SQLschema = None
+        self.report_types = None
+        self.access_token = None
+        self.access_token_startTime = None
+        self.set_attributes()
+        
+
+    def set_attributes(self):
+        if self.API_domain == 'therabody':
+            self.login_API = therabody_dic['loginAPI'].replace('API_domain', self.API_domain)
+            self.base_API = therabody_dic['baseAPI']
+            self.SQLschema = therabody_dic['SQLschema']
+            self.client_id = therabody_dic['clientID']
+            self.client_secret = therabody_dic['client_secret']
+            self.report_types = therabody_dic['report_types']
+        
+        if self.API_domain == 'rootinsurance':
+            self.login_API = root_dic['loginAPI'].replace('API_domain', self.API_domain)
+            self.base_API = root_dic['baseAPI']
+            self.SQLschema = root_dic['SQLschema']
+            self.client_id = root_dic['clientID']
+            self.client_secret = root_dic['client_secret']
+            self.report_types = root_dic['report_types']
+
+
+    def authorize(self):    
+        encodedData = base64.b64encode(bytes(f"{self.client_id}:{self.client_secret}", "ISO-8859-1")).decode("ascii")
+
+        payload = "grant_type=client_credentials"
+
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Basic {encodedData}",
+        "content-type": "application/x-www-form-urlencoded"
+        }
+
+        if self.access_token_startTime == None:
+            self.access_token_startTime = time.time()
+            response = requests.post(self.login_API, data=payload, headers=headers)
+            access_token = response.json()['access_token']
+            self.access_token = access_token
+        else:
+            access_token_end = time.time()
+            elapsed_time = access_token_end - self.access_token_startTime
+            if elapsed_time > 500:
+                self.access_token_startTime = None
+                self.authorize()
+
+
+    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
+        SQL_tables = []
+
+        if start_time == None:
+            self.SQLschema = self.SQLschema + 'Temp'
+            end_time = datetime.utcnow() + timedelta(minutes=-1)
+            start_time = end_time + timedelta(days=-days)
+        elif type(start_time) == str:
+            start_time = datetime.fromisoformat(start_time)
+            end_time = datetime.fromisoformat(end_time)
+
+        if tables == None:
+            print('No tables introduced')
+            return
+        elif tables == 'All':
+            report_types = self.report_types
+        else:
+            report_types = tables
+
+        for table in report_types:
+            SQL_tables.append(f'[{self.SQLschema}].[{table}]')
+
+        print(SQL_tables)
+        for i in range(len(SQL_tables)):
+            print(i)
+            now = datetime.utcnow()
+            
+            aux_start_time = start_time
+
+            aux_time = start_time + timedelta(days=1)
+
+            self.authorize()
+            
+            if 'Temp' in SQL_tables[i]:
+                SQLConnection.truncate(SQL_tables[i], self.API_domain)
+                hours = -8
+            else:
+                hours = 0
+
+            while aux_time <= end_time and aux_time <= now:
+                
+                self.authorize()
+                
+                print(f'\n{SQL_tables[i]} {self.API_domain}')
+                print(f'Load until: {end_time + timedelta(hours=hours)}')
+                print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
+                print(self.access_token[-10:-1])
+                
+                job = self.execute_report(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
+                df = self.get_dataReport(report_types[i], job)
+                self.delete_report(report_types[i], job)
+                SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
+
+                aux_start_time = aux_start_time + timedelta(days=1)
+                aux_time = aux_start_time + timedelta(days=1)
+
+        print('Finish loading Data\n')
 
 
     def execute_report(self, report_type, from_date, to_date):
@@ -69,17 +180,18 @@ class API_Talkdesk(API):
                 df = df_entries.fillna('')
                 # print(df.columns)
                 
-                try:
-                    if report_type == 'user_status':
-                        df['user_status_id'] = df['user_id'] + ' ' + df['status_start_at'].astype(str)
-                    if report_type == 'adherence':
-                        df['adherence_id'] = df['agent_name'] + ' ' + df['adherence_event_start_time'].astype(str)
-                    if report_type == 'feedback_flow':
-                        df.rename(columns= {'ring\xa0group': 'ring group'}, inplace=True)
-                    # print(df)
-                    # print(df.columns)
-                except KeyError as e:
-                    pass
+                if self.API_domain == 'rootinsurance':
+                    try:
+                        if report_type == 'user_status':
+                            df['user_status_id'] = df['user_id'] + ' ' + df['status_start_at'].astype(str)
+                        if report_type == 'adherence':
+                            df['adherence_id'] = df['agent_name'] + ' ' + df['adherence_event_start_time'].astype(str)
+                        if report_type == 'feedback_flow':
+                            df.rename(columns= {'ring\xa0group': 'ring group'}, inplace=True)
+                        # print(df)
+                        # print(df.columns)
+                    except KeyError as e:
+                        pass
 
                 isValidResponse = True
             except:
