@@ -1,9 +1,9 @@
-from Requests import Request
+from API import API
 import time
 
 
-ultra = Request('ultra')
+ultra = API('ultra')
 
 while True:
-    ultra.load_data('All')
+    ultra.API.load_data('All')
     time.sleep(5 * 60)

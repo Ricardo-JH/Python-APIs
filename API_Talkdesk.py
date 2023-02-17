@@ -85,9 +85,7 @@ class API_Talkdesk:
         for table in report_types:
             SQL_tables.append(f'[{self.SQLschema}].[{table}]')
 
-        print(SQL_tables)
         for i in range(len(SQL_tables)):
-            print(i)
             now = datetime.utcnow()
             
             aux_start_time = start_time

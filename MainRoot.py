@@ -1,9 +1,9 @@
-from Requests import Request
+from API import API
 import time
 
 
-root = Request('rootinsurance')
+root = API('rootinsurance')
 
 while True:
-    root.load_data('All')
+    root.API.load_data('All')
     time.sleep(5 * 60)
