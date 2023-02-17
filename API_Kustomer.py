@@ -10,12 +10,7 @@ from API import API
 class API_Kustomer(API):
     def __init__(self, API_domain):
         super().__init__(API_domain)
-        self.responses_dict = {#SQL_table : DataFrame_column
-                                'users_presence': 'userDetails',
-                                'users_routingStatus': 'userDetails',
-                                'users': 'entities',
-                                'conversations': 'conversations' 
-}
+        
 
     def execute_report(self, report_type, from_date, to_date):
 
