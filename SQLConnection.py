@@ -5,11 +5,11 @@ def insert(dataFrame, SQL_Table, API_domain, fromTemp='No'):
     global cursor
     if API_domain == 'therabody':
         Database = 'DbTherabody'
-    elif API_domain == 'rootinsurance':
+    elif API_domain in ['rootinsurance', 'kustomer']:
         Database = 'RootInsurance'
     elif API_domain == 'ultra':
         Database = 'Ultra'
-
+    
     Driver = 'ODBC Driver 17 for SQL Server'
     Server = 'SQLSERVER\GGAMASTEDDB'
     # Database = 'RootInsurance'
@@ -61,7 +61,7 @@ def truncate(SQL_Table, API_domain):
     global cursor
     if API_domain == 'therabody':
         Database = 'DbTherabody'
-    elif API_domain == 'rootinsurance':
+    elif API_domain in ['rootinsurance', 'kustomer']:
         Database = 'RootInsurance'
     elif API_domain == 'ultra':
         Database = 'Ultra'

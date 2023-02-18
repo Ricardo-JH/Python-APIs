@@ -23,7 +23,8 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
 }
 
 kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
+                    'searchAPI':  'https://api.kustomerapp.com/v1/customers/search',
                     'API_key':  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYzYjVlMDFkN2FiNGVmOGZjYTFhZDUzNSIsInVzZXIiOiI2M2I1ZTAxYzcxMmFlNGY0YWI4MGMxZTIiLCJvcmciOiI1ZmVkZWU4MjdkYWYyY2ZlMWE4M2U5Y2UiLCJvcmdOYW1lIjoiam9pbnJvb3QiLCJ1c2VyVHlwZSI6Im1hY2hpbmUiLCJwb2QiOiJwcm9kMSIsInJvbGVzIjpbIm9yZy5hZG1pbiIsIm9yZy5hZG1pbi5hbmFseXRpY3MiLCJvcmcuYWRtaW4uYXBpIiwib3JnLmFkbWluLmtsYXNzIiwib3JnLmFkbWluLmxvZ3MiLCJvcmcuYWRtaW4ubWVzc2FnZSIsIm9yZy5hZG1pbi5yZWFkIiwib3JnLmFkbWluLnNhdGlzZmFjdGlvbiIsIm9yZy5hZG1pbi5zY2hlZHVsZSIsIm9yZy5hZG1pbi5zZWFyY2giLCJvcmcuYWRtaW4uc2xhIiwib3JnLmFkbWluLnVzZXIiLCJvcmcucGVybWlzc2lvbi5jb252ZXJzYXRpb24iLCJvcmcucGVybWlzc2lvbi5jdXN0b21lciIsIm9yZy5wZXJtaXNzaW9uLmRlbGV0ZSIsIm9yZy5wZXJtaXNzaW9uLmpvYiIsIm9yZy5wZXJtaXNzaW9uLmxvZ3MiLCJvcmcucGVybWlzc2lvbi5tZXNzYWdlIiwib3JnLnBlcm1pc3Npb24ucmVhZCIsIm9yZy5wZXJtaXNzaW9uLnJlcG9ydHNfY3VzdG9tLmNyZWF0ZSIsIm9yZy5wZXJtaXNzaW9uLnJlcG9ydHNfY3VzdG9tLnJlYWQiLCJvcmcucGVybWlzc2lvbi5zYXRpc2ZhY3Rpb24iLCJvcmcucGVybWlzc2lvbi5zY2hlZHVsZSIsIm9yZy5wZXJtaXNzaW9uLnNlYXJjaCIsIm9yZy5wZXJtaXNzaW9uLnNsYSIsIm9yZy5wZXJtaXNzaW9uLnRhZyIsIm9yZy5wZXJtaXNzaW9uLnVzZXIiLCJvcmcucGVybWlzc2lvbi53b3JrX2l0ZW0iLCJvcmcucGVybWlzc2lvbi53b3JrX3Nlc3Npb24iLCJvcmcucGVybWlzc2lvbi53b3JrZmxvdyJdLCJleHAiOjE2NzgwNDc3OTAsImF1ZCI6InVybjpjb25zdW1lciIsImlzcyI6InVybjphcGkiLCJzdWIiOiI2M2I1ZTAxYzcxMmFlNGY0YWI4MGMxZTIifQ.Lu0-GRKvW87hFaUTysRuX9g0XI4HAmSCF9CZGpbShQ4',
                     'SQLschema': 'Kustomer',
-                    'report_types': ['conversations', 'messages', 'work-sessions', 'work-items', 'users', 'sla', 'satisfaction']
+                    'report_types': ['conversation'] # 'work-sessions', 'work-items', 'users', 'sla', 'satisfaction']
 }

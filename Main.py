@@ -2,11 +2,11 @@ from API import API
 import time
 
 
-ultra = API('ultra')
+kustomer = API('kustomer')
 
 # ultra.API.load_users()
 # ultra.API.load_schedules_activityCodes()
-# ultra.API.load_data('All')
+kustomer.API.load_data('All')
 
 # while True:
     # root.API.load_data('All')
