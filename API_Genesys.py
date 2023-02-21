@@ -57,13 +57,69 @@ class API_Genesys():
                 self.authorize()
 
 
-    def load_usersPresence(self, aux_start_time, aux_time, report_type, SQL_table):
-        job = self.execute_usersPresence(report_type, aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
-        df = self.get_usersPresence(report_type, job)
-        self.delete_report(report_type, job)
+    def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
+        job = self.execute_jobId(report_type, from_date, to_date)
+        url = f'{self.base_API}/analytics/users/details/jobs/{job}'
+        
+        df = pd.DataFrame()
+        isValidResponse = False
+        cursor = 'init'
+
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {self.access_token}"
+        }
+
+        start_time = time.time()
+
+        while not isValidResponse:
+            while cursor != '':
+                try:
+                    job_status = requests.get(url, headers=headers).json()
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"'Couldn't retrieve Job\n{e}")
+
+                if job_status['state'] == 'FULFILLED':
+                    
+                    if cursor != 'init':
+                        url_iter = f'{url}/results?cursor={cursor}'
+                    else:
+                        url_iter = f'{url}/results'
+                    
+                    try:
+                        response = requests.get(url_iter, headers=headers).json()
+                        df_response = pd.DataFrame(response['userDetails']).fillna('')
+                    except:
+                        print(f"Couldn't get results ob Job: {url_iter}")
+
+                    for row_i in range(len(df_response.axes[0])):
+                        try:
+                            if report_type == 'users_presence':
+                                userId = df_response['userId'].iloc[row_i]
+                                row = df_response['primaryPresence'].iloc[row_i]
+                        
+                                for dict in row:
+                                    dict['userId'] = userId
+                                    new_row = pd.DataFrame(dict, index=[0])
+                                    df = pd.concat([new_row, df.loc[:]]).reset_index(drop=True).fillna('')
+                        except:
+                            print(f'row {row_i}\nCould not be loaded')
+                    
+                    try:
+                        cursor = response['cursor']
+                    except:
+                        cursor = ''
+            isValidResponse = True
+
+        elapsedTime = time.time() - start_time
+        print(f'Time to get Data Report: {elapsedTime} Sec')
+       
+        df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
+        df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
+
         SQLConnection.insert(df, SQL_table, self.API_domain)
-        
-        
+        self.delete_report(report_type, job)
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
@@ -112,10 +168,13 @@ class API_Genesys():
                 print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
                 print(self.access_token[-10:-1])
 
+                from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
+                to_date = aux_time.strftime('%Y-%m-%dT%H:%M:%S')
+
                 if report_types[i] == 'users_presence':
-                    self.load_usersPresence(aux_start_time, aux_time, report_types[i], SQL_tables[i])
+                    self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
                 if report_types[i] == 'conversations':
-                    self.load_conversations(aux_start_time, aux_time, report_types[i], SQL_tables[i])
+                    self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
 
                 aux_start_time = aux_start_time + timedelta(days=1)
                 aux_time = aux_start_time + timedelta(days=1)
@@ -204,13 +263,12 @@ class API_Genesys():
             aux_start_of_week = aux_start_of_week - timedelta(days=7)
 
 
-    def execute_usersPresence(self, report_type, from_date, to_date):
+    def execute_jobId(self, report_type, from_date, to_date):
 
         isValidResponse = False
         
-        url = f'{self.base_API}/{report_type}/details/jobs'
-        url = url.replace('users_presence', 'analytics/users')
-        url = url.replace('users_routingStatus', 'analytics/users')
+        url = f'{self.base_API}/analytics/{report_type}/details/jobs'
+        url = url.replace('users_presence', 'users')
         
         payload = {"format": "json",
                     "Name": "TestReport",
@@ -239,82 +297,6 @@ class API_Genesys():
         
         return job_ID
         
-
-    def get_usersPresence(self, report_type, job_ID):
-        df = pd.DataFrame()
-        isValidResponse = False
-        cursor = 'init'
-
-        url = f'{self.base_API}/{report_type}/details/jobs/{job_ID}'
-        url = url.replace('users_presence', 'analytics/users')
-        url = url.replace('users_routingStatus', 'analytics/users')        
-        
-        headers = {
-        "accept": "application/json",
-        "Authorization": f"Bearer {self.access_token}"
-        }
-
-        start_time = time.time()
-
-        while not isValidResponse:
-            while cursor != '':
-
-                try:
-                    job_status = requests.get(url, headers=headers).json()
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"'Couldn't retrieve Job\n{e}")
-
-                if job_status['state'] == 'FULFILLED':
-                    
-                    if cursor != 'init':
-                        url_iter = f'{url}/results?cursor={cursor}'
-                    else:
-                        url_iter = f'{url}/results'
-                    
-                    try:
-                        response = requests.get(url_iter, headers=headers).json()
-                        df_response = pd.DataFrame(response['userDetails']).fillna('')
-                    except:
-                        print(f"Couldn't get results ob Job: {url_iter}")
-
-                    for row_i in range(len(df_response.axes[0])):
-                        try:
-                            if report_type == 'users_presence':
-                                userId = df_response['userId'].iloc[row_i]
-                                row = df_response['primaryPresence'].iloc[row_i]
-                            elif report_type == 'users_routingStatus':
-                                userId = df_response['userId'].iloc[row_i]
-                                row = df_response['routingStatus'].iloc[row_i]
-                        
-                            if report_type in ['users_presence', 'users_routingStatus']:
-                                for dict in row:
-                                    dict['userId'] = userId
-                                    new_row = pd.DataFrame(dict, index=[0])
-                                    df = pd.concat([new_row, df.loc[:]]).reset_index(drop=True).fillna('')
-                        except:
-                            print(f'row {row_i}\nCould not be loaded')
-                    
-                    try:
-                        cursor = response['cursor']
-                    except:
-                        cursor = ''
-            isValidResponse = True
-
-        elapsedTime = time.time() - start_time
-        print(f'Time to get Data Report: {elapsedTime} Sec')
-       
-        if report_type == 'users_presence':
-            df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
-        if report_type == 'users_routingStatus':
-            df['users_routingStatus_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
-        
-        # print(df)
-        # print(df.query('endTime == ""'))
-        df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
-        
-        return df
-
 
     def delete_report(self, report_type, job_ID):
 
