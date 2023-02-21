@@ -47,7 +47,7 @@ class API_Genesys():
             #response = requests.post(self.login_API, data=payload, headers=headers)
             #access_token = response.json()['access_token']
             #self.access_token = access_token
-            self.access_token = 'X0lylVPiT3M4V6VLew3zcNd3Js2WFJ7P138-0pOJTnqfyyu7-jBea2hhjYBGnNTKCt7CyIybY7FlaxQDxKZ1wQ'
+            self.access_token = 'AFdWRYvGn0oXFYTq7BraKAYfh3rRDWTKR0PqvjEwkjq5vEaHSnvwke3ipHSs_DjT7So8qfKeWRGQSO_GLj3etA'
 
         else:
             access_token_end = time.time()
@@ -55,6 +55,15 @@ class API_Genesys():
             if elapsed_time > 500:
                 self.access_token_startTime = None
                 self.authorize()
+
+
+    def load_usersPresence(self, aux_start_time, aux_time, report_type, SQL_table):
+        job = self.execute_usersPresence(report_type, aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
+        df = self.get_usersPresence(report_type, job)
+        self.delete_report(report_type, job)
+        SQLConnection.insert(df, SQL_table, self.API_domain)
+        
+        
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
@@ -102,17 +111,17 @@ class API_Genesys():
                 print(f'Load until: {end_time + timedelta(hours=hours)}')
                 print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
                 print(self.access_token[-10:-1])
-                
-                job = self.execute_report(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
-                df = self.get_dataReport(report_types[i], job)
-                self.delete_report(report_types[i], job)
-                SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
+
+                if report_types[i] == 'users_presence':
+                    self.load_usersPresence(aux_start_time, aux_time, report_types[i], SQL_tables[i])
+                if report_types[i] == 'conversations':
+                    self.load_conversations(aux_start_time, aux_time, report_types[i], SQL_tables[i])
 
                 aux_start_time = aux_start_time + timedelta(days=1)
                 aux_time = aux_start_time + timedelta(days=1)
 
         print('Finish loading Data\n')
-
+    
 
     def load_schedules(self, op=1):
         
@@ -195,7 +204,7 @@ class API_Genesys():
             aux_start_of_week = aux_start_of_week - timedelta(days=7)
 
 
-    def execute_report(self, report_type, from_date, to_date):
+    def execute_usersPresence(self, report_type, from_date, to_date):
 
         isValidResponse = False
         
@@ -231,7 +240,7 @@ class API_Genesys():
         return job_ID
         
 
-    def get_dataReport(self, report_type, job_ID):
+    def get_usersPresence(self, report_type, job_ID):
         df = pd.DataFrame()
         isValidResponse = False
         cursor = 'init'
@@ -461,6 +470,3 @@ class API_Genesys():
         print(f'Time to get LOBs: {elapsedTime} Sec')
 
         return LOB_list, schedule_id
-
-        
-        
