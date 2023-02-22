@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from API_parameters import ultra_dic
 import SQLConnection
 import pandas as pd
+import numpy as np
 import requests
 import base64
 import time
@@ -57,13 +58,21 @@ class API_Genesys():
                 self.authorize()
 
 
-    def depack_json(self, json):
-        df_lv0 = pd.DataFrame(json)
+    def depack_json(self, json, base=pd.DataFrame()):
+        try:
+            df_lv0 = pd.DataFrame(json)
+        except ValueError:
+            df_lv0 = pd.DataFrame(pd.json_normalize(json))
+
         columns_containing_json = []
         columns_containing_list = []
 
-        print(df_lv0)
+        if not base.empty:
+            for column in base.columns:
+                df_lv0[column] = base[column].iloc[0]
         
+        print(df_lv0)
+
         # get columns containing json and list data
         for column in df_lv0.columns:
             first_element = df_lv0[column].iloc[0]
@@ -72,33 +81,41 @@ class API_Genesys():
             if type(first_element) == list:
                 columns_containing_list.append(column)
         
-        
+        df_lv0_base = df_lv0[np.setdiff1d(df_lv0.columns, columns_containing_json + columns_containing_list)][0:1]
+
         if len(columns_containing_list) > 0:
             # access to every list
             for column_list in columns_containing_list:
-                print(df_lv0[column_list])
-                # self.depack_json(json[column])
-                # df_lv2 = pd.DataFrame(json[column])
-                # print(column)
-                # print(df_lv2)
-
-                # for row_i in range(1):#df_lv2.shape[0]):
-                    # row_json = pd.DataFrame(df_lv2.iloc[row_i])
-                    # print(row_json)
-                    # self.depack_json(row_json)
+                df_column_containing_list = df_lv0[column_list]
+                # print(df_column_containing_list)
+                
+                for lis_in_column in df_column_containing_list:#df_lv2.shape[0]):
+                    # print(lis_in_column)
+                    for element_in_lis_in_column_containing_list in lis_in_column:
+                        if type(element_in_lis_in_column_containing_list) == str:
+                            print(pd.DataFrame({column_list: element_in_lis_in_column_containing_list}, index=[0]))
+                        elif type(element_in_lis_in_column_containing_list) == dict:
+                            df = self.depack_json(element_in_lis_in_column_containing_list)
+                        else:
+                            print('nor a list or dict')
+                            print(type(element_in_lis_in_column_containing_list))
         
         if len(columns_containing_json) > 0:
             # access to every json
+            # print(json)
+            # print(df_lv0)
+            # print(columns_containing_json)
             for column_json in columns_containing_json:
-                self.depack_json(json[column_json])
+                # print(column_json)
+                # print(df_lv0[column_json])
+                # print(df_lv0[column_json].shape[0])
+                # print(df_lv0[column_json].iloc[0])
+                # print(type(df_lv0[column_json]))
+                # print(type(df_lv0[column_json].iloc[0]))
+                for serie in df_lv0[column_json]:
+                    df = self.depack_json(serie)
                 print('after depack')
-
-        '''
-        
-        for column in columns_containing_json:
-            response = json[column]
-            print(response)
-        '''
+        return df
 
 
     def get_LOB(self, week):
@@ -469,13 +486,14 @@ class API_Genesys():
                     else:
                         url_iter = f'{url}/results'
                     
-                    try:
-                        response = requests.get(url_iter, headers=headers).json()
-                        response = self.depack_json(response)
-                        return
-                        df_response = pd.DataFrame(response['conversations']).fillna('')
-                    except:
-                        print(f"Couldn't get results ob Job: {url_iter}")
+                # try:
+                    response = requests.get(url_iter, headers=headers).json()
+                    response = self.depack_json(response)
+                    return
+                    df_response = pd.DataFrame(response['conversations']).fillna('')
+                # except:
+                    
+                    print(f"Couldn't get results ob Job: {url_iter}")
                     return
                     for row_i in range(len(df_response.axes[0])):
                         try:
