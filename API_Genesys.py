@@ -72,17 +72,26 @@ class API_Genesys():
             if type(first_element) == list:
                 columns_containing_list.append(column)
         
-        # access every json
-        for column in columns_containing_json:
-            # self.depack_json(json[column])
-            df_lv1 = pd.DataFrame(json[column])
-            print(df_lv1)
         
-        # access every list
-        for column in columns_containing_list:
-            # self.depack_json(json[column])
-            df_lv2 = pd.DataFrame(json[column])
-            print(df_lv2)
+        if len(columns_containing_list) > 0:
+            # access to every list
+            for column_list in columns_containing_list:
+                print(df_lv0[column_list])
+                # self.depack_json(json[column])
+                # df_lv2 = pd.DataFrame(json[column])
+                # print(column)
+                # print(df_lv2)
+
+                # for row_i in range(1):#df_lv2.shape[0]):
+                    # row_json = pd.DataFrame(df_lv2.iloc[row_i])
+                    # print(row_json)
+                    # self.depack_json(row_json)
+        
+        if len(columns_containing_json) > 0:
+            # access to every json
+            for column_json in columns_containing_json:
+                self.depack_json(json[column_json])
+                print('after depack')
 
         '''
         
