@@ -6,7 +6,8 @@ ultra = API('ultra')
 
 # ultra.API.load_users()
 # ultra.API.load_schedules_activityCodes()
-ultra.API.load_data('All')
+ultra.API.load_data(['conversations'])
+
 
 # while True:
     # root.API.load_data('All')

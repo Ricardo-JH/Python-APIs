@@ -19,7 +19,7 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
                 'clientID': 'e22d4f86-c236-4898-a566-fedfc9d666aa',
                 'client_secret': 'MKMNw3DtTBWTtLluWMSGGsgmtCA5JTh_z1j2_5BnA6U',
                 'SQLschema': 'Genesys',
-                'report_types': ['users_presence']
+                'report_types': ['users_presence', 'conversations']
 }
 
 kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',

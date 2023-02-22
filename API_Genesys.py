@@ -57,6 +57,41 @@ class API_Genesys():
                 self.authorize()
 
 
+    def depack_json(self, json):
+        df_lv0 = pd.DataFrame(json)
+        columns_containing_json = []
+        columns_containing_list = []
+
+        print(df_lv0)
+        
+        # get columns containing json and list data
+        for column in df_lv0.columns:
+            first_element = df_lv0[column].iloc[0]
+            if type(first_element) == dict:
+                columns_containing_json.append(column)
+            if type(first_element) == list:
+                columns_containing_list.append(column)
+        
+        # access every json
+        for column in columns_containing_json:
+            # self.depack_json(json[column])
+            df_lv1 = pd.DataFrame(json[column])
+            print(df_lv1)
+        
+        # access every list
+        for column in columns_containing_list:
+            # self.depack_json(json[column])
+            df_lv2 = pd.DataFrame(json[column])
+            print(df_lv2)
+
+        '''
+        
+        for column in columns_containing_json:
+            response = json[column]
+            print(response)
+        '''
+
+
     def get_LOB(self, week):
         LOB_list = []
 
@@ -384,6 +419,75 @@ class API_Genesys():
                         cursor = ''
             isValidResponse = True
 
+        elapsedTime = time.time() - start_time
+        print(f'Time to get Data Report: {elapsedTime} Sec')
+       
+        df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
+        df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
+
+        SQLConnection.insert(df, SQL_table, self.API_domain)
+        self.delete_report(report_type, job)
+
+
+    def load_conversations(self, report_type, SQL_table, from_date, to_date):
+        # job = self.execute_jobId(report_type, from_date, to_date)
+        job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
+        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
+        
+        df = pd.DataFrame()
+        isValidResponse = False
+        cursor = 'init'
+
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {self.access_token}"
+        }
+
+        start_time = time.time()
+
+        while not isValidResponse:
+            while cursor != '':
+                try:
+                    job_status = requests.get(url, headers=headers).json()
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"'Couldn't retrieve Job\n{e}")
+
+                if job_status['state'] == 'FULFILLED':
+                    
+                    if cursor != 'init':
+                        url_iter = f'{url}/results?cursor={cursor}'
+                    else:
+                        url_iter = f'{url}/results'
+                    
+                    try:
+                        response = requests.get(url_iter, headers=headers).json()
+                        response = self.depack_json(response)
+                        return
+                        df_response = pd.DataFrame(response['conversations']).fillna('')
+                    except:
+                        print(f"Couldn't get results ob Job: {url_iter}")
+                    return
+                    for row_i in range(len(df_response.axes[0])):
+                        try:
+                            if report_type == 'users_presence':
+                                userId = df_response['userId'].iloc[row_i]
+                                row = df_response['primaryPresence'].iloc[row_i]
+                        
+                                for dict in row:
+                                    dict['userId'] = userId
+                                    new_row = pd.DataFrame(dict, index=[0])
+                                    df = pd.concat([new_row, df.loc[:]]).reset_index(drop=True).fillna('')
+                        except:
+                            print(f'row {row_i}\nCould not be loaded')
+                    
+                    try:
+                        cursor = response['cursor']
+                    except:
+                        cursor = ''
+            return
+            isValidResponse = True
+        return
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
        
