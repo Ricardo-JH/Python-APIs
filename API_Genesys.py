@@ -68,7 +68,7 @@ class API_Genesys():
         
         df_columns = pd.DataFrame(data={"columns": columns}).replace({'<class ': '', '>': ''}, regex=True).drop_duplicates(['columns'])
         df_columns = df_columns.replace({"'str'": 'nvarchar(50)', "'float'": 'float', "'numpy.bool_'": 'bit', "'bool'": 'bit'}, regex=True)
-        print(df_columns)
+        # print(df_columns)
         df_columns.to_csv("./table_columns.csv", sep=',',index=False)
 
 
@@ -88,11 +88,16 @@ class API_Genesys():
         columns_containing_list = []
 
         for column in df_lv0.columns:
-            first_element = df_lv0[column].iloc[0]
-            if type(first_element) == list:
-                columns_containing_list.append(column)
-            if type(first_element) == dict:
-                columns_containing_json.append(column)
+            for i in range(df_lv0[column].shape[0]):
+                element = df_lv0[column].iloc[i]
+                # print(column, ' ', element)
+                if type(element) == list:
+                    columns_containing_list.append(column)
+                    break
+                if type(element) == dict:
+                    columns_containing_json.append(column)
+                    break
+
         
         # convert List to values 
         if len(columns_containing_list) > 0:
@@ -111,7 +116,7 @@ class API_Genesys():
                 # drop duplicated columns
                 columns = json_df.columns.str.lower().str.strip()
                 duplicate_columns = json_df.columns[columns.duplicated()]
-                print(duplicate_columns)
+                # print(duplicate_columns)
                 json_df.drop(columns=duplicate_columns, inplace=True)
                 df_lv0.drop(columns=[column_json], inplace=True)
 
@@ -512,7 +517,6 @@ class API_Genesys():
 
                     try:
                         cursor = response['cursor']
-                        # cursor = ''
                     except:
                         cursor = ''
             isValidResponse = True
@@ -521,7 +525,6 @@ class API_Genesys():
         print(f'Time to get Data Report: {elapsedTime} Sec')
 
         self.create_table(df)
-        
         # SQLConnection.insert(df, SQL_table, self.API_domain)
         # self.delete_report(report_type, job)
 
