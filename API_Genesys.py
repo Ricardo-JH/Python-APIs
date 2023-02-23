@@ -64,11 +64,11 @@ class API_Genesys():
 
     def create_table(self, df=pd.DataFrame()):
         columns_type = [type(df[column].iloc[0]) for column in df.columns]
-        columns = [f'[{column}] {str(type)} ,' for column, type in (zip(df.columns, columns_type))]
+        columns = [f'[{column}] {str(type)},' for column, type in (zip(df.columns, columns_type))]
         
-        df_columns = pd.DataFrame(data={"columns": columns}).replace({'<class ': '', '>': ''}, regex=True)
-        df_columns = df_columns.replace({"'str'": 'nvarchar(50)', "'float'": 'float', "'numpy.bool'": 'bit', "'bool'": 'bit'}, regex=True)
-        
+        df_columns = pd.DataFrame(data={"columns": columns}).replace({'<class ': '', '>': ''}, regex=True).drop_duplicates(['columns'])
+        df_columns = df_columns.replace({"'str'": 'nvarchar(50)', "'float'": 'float', "'numpy.bool_'": 'bit', "'bool'": 'bit'}, regex=True)
+        print(df_columns)
         df_columns.to_csv("./table_columns.csv", sep=',',index=False)
 
 
@@ -81,7 +81,6 @@ class API_Genesys():
             df_lv0 = pd.DataFrame(pd.json_normalize(json)).fillna('')
         except Exception as e:
             pass
-
         # print(df_lv0)
 
         # get columns containing json and list data
@@ -105,7 +104,17 @@ class API_Genesys():
         if len(columns_containing_json) > 0:
             for column_json in columns_containing_json:
                 json_df = pd.DataFrame(df_lv0[column_json].map(dict).values.tolist()).fillna('')
+
+                # sort columns
+                json_df = json_df.reindex(sorted(json_df.columns), axis=1)
+
+                # drop duplicated columns
+                columns = json_df.columns.str.lower().str.strip()
+                duplicate_columns = json_df.columns[columns.duplicated()]
+                print(duplicate_columns)
+                json_df.drop(columns=duplicate_columns, inplace=True)
                 df_lv0.drop(columns=[column_json], inplace=True)
+
                 for column in json_df.columns:
                     df_lv0[f'{column_json}.{column}'] = json_df[column]
 
@@ -496,7 +505,6 @@ class API_Genesys():
                     try:
                         response = requests.get(url_iter, headers=headers).json()
                         df_response = self.depack_json(response['conversations'])
-                        # print(df_response)
                     except:
                         print(f"Couldn't get results from: {url_iter}")
                     
@@ -511,11 +519,11 @@ class API_Genesys():
 
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
+
+        self.create_table(df)
         
-        # self.create_table(df)
-        
-        SQLConnection.insert(df, SQL_table, self.API_domain)
-        self.delete_report(report_type, job)
+        # SQLConnection.insert(df, SQL_table, self.API_domain)
+        # self.delete_report(report_type, job)
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
