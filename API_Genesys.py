@@ -500,7 +500,7 @@ class API_Genesys():
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
         # job = self.execute_jobId(report_type, from_date, to_date)
         job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
-        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}?pageSize=10000'
+        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
         
         df = pd.DataFrame()
         isValidResponse = False
@@ -546,8 +546,8 @@ class API_Genesys():
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
 
-        self.create_table(df, 'conversation')
-        # SQLConnection.insert(df, SQL_table, self.API_domain)
+        # self.create_table(df, 'conversation')
+        SQLConnection.insert(df, SQL_table, self.API_domain)
         # self.delete_report(report_type, job)
 
 
