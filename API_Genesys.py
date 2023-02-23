@@ -62,6 +62,16 @@ class API_Genesys():
                 self.authorize()
 
 
+    def create_table(self, df=pd.DataFrame()):
+        columns_type = [type(df[column].iloc[0]) for column in df.columns]
+        columns = [f'[{column}] {str(type)} ,' for column, type in (zip(df.columns, columns_type))]
+        
+        df_columns = pd.DataFrame(data={"columns": columns}).replace({'<class ': '', '>': ''}, regex=True)
+        df_columns = df_columns.replace({"'str'": 'nvarchar(50)', "'float'": 'float', "'numpy.bool'": 'bit', "'bool'": 'bit'}, regex=True)
+        
+        df_columns.to_csv("./table_columns.csv", sep=',',index=False)
+
+
     def depack_json(self, json):
         
         # convert json to DataFrame
@@ -483,42 +493,27 @@ class API_Genesys():
                     else:
                         url_iter = f'{url}/results'
                     
-                # try:
-                    response = requests.get(url_iter, headers=headers).json()
-                    df = self.depack_json(response)
-                    print(df)
-                    return
-                    df_response = pd.DataFrame(response['conversations']).fillna('')
-                # except:
+                    try:
+                        response = requests.get(url_iter, headers=headers).json()
+                        df_response = self.depack_json(response['conversations'])
+                        # print(df_response)
+                    except:
+                        print(f"Couldn't get results from: {url_iter}")
                     
-                    print(f"Couldn't get results ob Job: {url_iter}")
-                    return
-                    for row_i in range(len(df_response.axes[0])):
-                        try:
-                            if report_type == 'users_presence':
-                                userId = df_response['userId'].iloc[row_i]
-                                row = df_response['primaryPresence'].iloc[row_i]
-                        
-                                for dict in row:
-                                    dict['userId'] = userId
-                                    new_row = pd.DataFrame(dict, index=[0])
-                                    df = pd.concat([new_row, df.loc[:]]).reset_index(drop=True).fillna('')
-                        except:
-                            print(f'row {row_i}\nCould not be loaded')
-                    
+                    df = pd.concat([df_response, df.loc[:]]).reset_index(drop=True).fillna('')
+
                     try:
                         cursor = response['cursor']
+                        # cursor = ''
                     except:
                         cursor = ''
-            return
             isValidResponse = True
-        return
+
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
-       
-        df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
-        df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
-
+        
+        # self.create_table(df)
+        
         SQLConnection.insert(df, SQL_table, self.API_domain)
         self.delete_report(report_type, job)
 
