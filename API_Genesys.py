@@ -498,8 +498,8 @@ class API_Genesys():
 
 
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        # job = self.execute_jobId(report_type, from_date, to_date)
-        job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
+        job = self.execute_jobId(report_type, from_date, to_date)
+        # job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
         url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
         
         df = pd.DataFrame()
@@ -544,11 +544,21 @@ class API_Genesys():
             isValidResponse = True
 
         elapsedTime = time.time() - start_time
+        start_time = time.time()
         print(f'Time to get Data Report: {elapsedTime} Sec')
 
+        # create Table
         # self.create_table(df, 'conversation')
+        # elapsedTime = time.time() - start_time
+        # start_time = time.time()
+        # print(f'Time to get Data Report: {elapsedTime} Sec')
+
         SQLConnection.insert(df, SQL_table, self.API_domain)
-        # self.delete_report(report_type, job)
+        elapsedTime = time.time() - start_time
+        start_time = time.time()
+        print(f'Time to insert Data Report: {elapsedTime} Sec')        
+        
+        self.delete_report(report_type, job)
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
