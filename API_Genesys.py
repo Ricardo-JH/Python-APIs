@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta
 from API_parameters import ultra_dic
+from warnings import simplefilter
 import SQLConnection
 import pandas as pd
 import numpy as np
 import requests
 import base64
 import time
+
+
+simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 
 class API_Genesys():
@@ -58,64 +62,57 @@ class API_Genesys():
                 self.authorize()
 
 
-    def depack_json(self, json, base=pd.DataFrame()):
+    def depack_json(self, json):
+        
+        # convert json to DataFrame
         try:
-            df_lv0 = pd.DataFrame(json)
+            df_lv0 = pd.DataFrame(json).fillna('')
         except ValueError:
-            df_lv0 = pd.DataFrame(pd.json_normalize(json))
+            df_lv0 = pd.DataFrame(pd.json_normalize(json)).fillna('')
+        except Exception as e:
+            pass
+
+        # print(df_lv0)
+
+        # get columns containing json and list data
+        columns_containing_json = []
+        columns_containing_list = []
+
+        for column in df_lv0.columns:
+            first_element = df_lv0[column].iloc[0]
+            if type(first_element) == list:
+                columns_containing_list.append(column)
+            if type(first_element) == dict:
+                columns_containing_json.append(column)
+        
+        # convert List to values 
+        if len(columns_containing_list) > 0:
+            # access to every column containing list
+            for column_list in columns_containing_list:
+                df_lv0[column_list] = df_lv0[column_list].explode(column_list)
+        
+        # convert Json to values
+        if len(columns_containing_json) > 0:
+            for column_json in columns_containing_json:
+                json_df = pd.DataFrame(df_lv0[column_json].map(dict).values.tolist()).fillna('')
+                df_lv0.drop(columns=[column_json], inplace=True)
+                for column in json_df.columns:
+                    df_lv0[f'{column_json}.{column}'] = json_df[column]
 
         columns_containing_json = []
         columns_containing_list = []
 
-        if not base.empty:
-            for column in base.columns:
-                df_lv0[column] = base[column].iloc[0]
-        
-        print(df_lv0)
-
-        # get columns containing json and list data
         for column in df_lv0.columns:
             first_element = df_lv0[column].iloc[0]
-            if type(first_element) == dict:
-                columns_containing_json.append(column)
             if type(first_element) == list:
                 columns_containing_list.append(column)
+            if type(first_element) == dict:
+                columns_containing_json.append(column)
+            
+        if len(columns_containing_json + columns_containing_list) > 0:
+            df_lv0 = self.depack_json(df_lv0)
         
-        df_lv0_base = df_lv0[np.setdiff1d(df_lv0.columns, columns_containing_json + columns_containing_list)][0:1]
-
-        if len(columns_containing_list) > 0:
-            # access to every list
-            for column_list in columns_containing_list:
-                df_column_containing_list = df_lv0[column_list]
-                # print(df_column_containing_list)
-                
-                for lis_in_column in df_column_containing_list:#df_lv2.shape[0]):
-                    # print(lis_in_column)
-                    for element_in_lis_in_column_containing_list in lis_in_column:
-                        if type(element_in_lis_in_column_containing_list) == str:
-                            print(pd.DataFrame({column_list: element_in_lis_in_column_containing_list}, index=[0]))
-                        elif type(element_in_lis_in_column_containing_list) == dict:
-                            df = self.depack_json(element_in_lis_in_column_containing_list)
-                        else:
-                            print('nor a list or dict')
-                            print(type(element_in_lis_in_column_containing_list))
-        
-        if len(columns_containing_json) > 0:
-            # access to every json
-            # print(json)
-            # print(df_lv0)
-            # print(columns_containing_json)
-            for column_json in columns_containing_json:
-                # print(column_json)
-                # print(df_lv0[column_json])
-                # print(df_lv0[column_json].shape[0])
-                # print(df_lv0[column_json].iloc[0])
-                # print(type(df_lv0[column_json]))
-                # print(type(df_lv0[column_json].iloc[0]))
-                for serie in df_lv0[column_json]:
-                    df = self.depack_json(serie)
-                print('after depack')
-        return df
+        return df_lv0
 
 
     def get_LOB(self, week):
@@ -488,7 +485,8 @@ class API_Genesys():
                     
                 # try:
                     response = requests.get(url_iter, headers=headers).json()
-                    response = self.depack_json(response)
+                    df = self.depack_json(response)
+                    print(df)
                     return
                     df_response = pd.DataFrame(response['conversations']).fillna('')
                 # except:
