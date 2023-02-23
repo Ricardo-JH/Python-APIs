@@ -7,6 +7,7 @@ import numpy as np
 import requests
 import base64
 import time
+import csv
 
 
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
@@ -52,7 +53,7 @@ class API_Genesys():
             #response = requests.post(self.login_API, data=payload, headers=headers)
             #access_token = response.json()['access_token']
             #self.access_token = access_token
-            self.access_token = 'AFdWRYvGn0oXFYTq7BraKAYfh3rRDWTKR0PqvjEwkjq5vEaHSnvwke3ipHSs_DjT7So8qfKeWRGQSO_GLj3etA'
+            self.access_token = 'al26MkRnRmxfonr3t23Lv93AKPBP_vSJgr1Ax1XPL5pKXYR6fRiCYyKrz_RDlpfhjKEeZlZz3fLyiPSjsDMnsg'
 
         else:
             access_token_end = time.time()
@@ -62,14 +63,34 @@ class API_Genesys():
                 self.authorize()
 
 
-    def create_table(self, df=pd.DataFrame()):
-        columns_type = [type(df[column].iloc[0]) for column in df.columns]
-        columns = [f'[{column}] {str(type)},' for column, type in (zip(df.columns, columns_type))]
+    def create_table(self, df=pd.DataFrame(), table_name='file'):
+        # set replacements
+        dict_rep = {"<class 'str'>": 'str', "<class 'float'>": 'float', "<class 'numpy.bool_'>": 'bit', "<class 'bool'>": 'bit'}
+        columns = []
+
+        # get list of types
+        columns_type = [str(type(df[column].iloc[0])) for column in df.columns]
+        columns_type = [dict_rep .get(item, item) for item in columns_type]
         
-        df_columns = pd.DataFrame(data={"columns": columns}).replace({'<class ': '', '>': ''}, regex=True).drop_duplicates(['columns'])
-        df_columns = df_columns.replace({"'str'": 'nvarchar(50)', "'float'": 'float', "'numpy.bool_'": 'bit', "'bool'": 'bit'}, regex=True)
+        # get max lengths
+        lens = np.vectorize(len)(df.values.astype(str)).max(axis=0)
+        # lens = [df[column].astype(str).str.len().max() for column in df]
+
+        # set table code
+        pos = 1
+        for column, typ, length in (zip(df.columns, columns_type, lens)):
+            if typ == 'str':
+                columns.append(f'[{column}] nvarchar({length})' )
+            else: 
+                columns.append(f'[{column}] {str(typ)}')
+            if pos < len(columns_type):
+                columns[-1] = columns[-1] + ','
+            pos += 1
+        
+        # show and save in a file
+        df_columns = pd.DataFrame(data={"columns": columns})#.drop_duplicates(['columns'])
+        df_columns.to_csv(f"./{table_name}_SQL.csv", sep='\\', header=False, index=False, quoting=csv.QUOTE_NONE, escapechar="\\", doublequote=False)
         # print(df_columns)
-        df_columns.to_csv("./table_columns.csv", sep=',',index=False)
 
 
     def depack_json(self, json):
@@ -479,7 +500,7 @@ class API_Genesys():
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
         # job = self.execute_jobId(report_type, from_date, to_date)
         job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
-        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
+        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}?pageSize=10000'
         
         df = pd.DataFrame()
         isValidResponse = False
@@ -517,6 +538,7 @@ class API_Genesys():
 
                     try:
                         cursor = response['cursor']
+                        # cursor = ''
                     except:
                         cursor = ''
             isValidResponse = True
@@ -524,7 +546,7 @@ class API_Genesys():
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
 
-        self.create_table(df)
+        self.create_table(df, 'conversation')
         # SQLConnection.insert(df, SQL_table, self.API_domain)
         # self.delete_report(report_type, job)
 
