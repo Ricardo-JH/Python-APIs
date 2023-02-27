@@ -53,7 +53,7 @@ class API_Genesys():
             #response = requests.post(self.login_API, data=payload, headers=headers)
             #access_token = response.json()['access_token']
             #self.access_token = access_token
-            self.access_token = 'al26MkRnRmxfonr3t23Lv93AKPBP_vSJgr1Ax1XPL5pKXYR6fRiCYyKrz_RDlpfhjKEeZlZz3fLyiPSjsDMnsg'
+            self.access_token = 'B7a4AL8CagFGgNx7fIC02M7gh6XOt6Okr94lihy1vBbANuzdiV6kKdoUq7wtE2UA1O9Oncu2niIaA4tTRwOilA'
 
         else:
             access_token_end = time.time()
