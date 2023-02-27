@@ -94,7 +94,6 @@ class API_Genesys():
 
 
     def depack_json(self, json):
-        
         # convert json to DataFrame
         try:
             df_lv0 = pd.DataFrame(json).fillna('')
@@ -102,11 +101,12 @@ class API_Genesys():
             df_lv0 = pd.DataFrame(pd.json_normalize(json)).fillna('')
         except Exception as e:
             pass
-        # print(df_lv0)
+        print(df_lv0)
 
         # get columns containing json and list data
         columns_containing_json = []
         columns_containing_list = []
+        columns_to_explode = []
 
         for column in df_lv0.columns:
             for i in range(df_lv0[column].shape[0]):
@@ -119,18 +119,26 @@ class API_Genesys():
                     columns_containing_json.append(column)
                     break
 
-        
-        # convert List to values 
+        # Convert List to values / Pass to columns_containing_json
         if len(columns_containing_list) > 0:
             # access to every column containing list
             for column_list in columns_containing_list:
-                df_lv0[column_list] = df_lv0[column_list].explode(column_list)
+                has_one_item = True
+                for i in range(df_lv0[column_list].shape[0]):
+                    if len(df_lv0[column_list].iloc[i]) > 1:
+                        has_one_item = False
+                        columns_to_explode.append(column_list)
+                        break
+                if has_one_item:
+                    df_lv0[column_list] = df_lv0[column_list].explode(column_list)
         
         # convert Json to values
         if len(columns_containing_json) > 0:
             for column_json in columns_containing_json:
+                
                 json_df = pd.DataFrame(df_lv0[column_json].map(dict).values.tolist()).fillna('')
-
+                # print(json_df)
+                
                 # sort columns
                 json_df = json_df.reindex(sorted(json_df.columns), axis=1)
 
@@ -143,6 +151,13 @@ class API_Genesys():
 
                 for column in json_df.columns:
                     df_lv0[f'{column_json}.{column}'] = json_df[column]
+        
+        # explode to Json values
+        if len(columns_to_explode) > 0:
+            for column_json in columns_to_explode:
+                # print(df_lv0)
+                df_lv0 = df_lv0.explode(column_json).reset_index(drop=True)
+                # print(df_lv0)
 
         columns_containing_json = []
         columns_containing_list = []
@@ -153,7 +168,9 @@ class API_Genesys():
                 columns_containing_list.append(column)
             if type(first_element) == dict:
                 columns_containing_json.append(column)
-            
+        
+        df_lv0.to_csv('data.csv')
+        
         if len(columns_containing_json + columns_containing_list) > 0:
             df_lv0 = self.depack_json(df_lv0)
         
@@ -498,9 +515,9 @@ class API_Genesys():
 
 
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        job = self.execute_jobId(report_type, from_date, to_date)
-        print(job)
-        # job = 'c7ec7db8-65f8-4cdc-a1f2-d114db9fe7ee'
+        # job = self.execute_jobId(report_type, from_date, to_date)
+        # print(job)
+        job = '133b19eb-6d5e-42fb-9494-07df86fcf69d'
         url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
         
         df = pd.DataFrame()
