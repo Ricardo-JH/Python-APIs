@@ -19,7 +19,8 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
                 'clientID': 'e22d4f86-c236-4898-a566-fedfc9d666aa',
                 'client_secret': 'MKMNw3DtTBWTtLluWMSGGsgmtCA5JTh_z1j2_5BnA6U',
                 'SQLschema': 'Genesys',
-                'report_types': ['users_presence', 'conversations']
+                'report_types': ['users_presence', 'conversations'],
+                'dict_columns': {'conversations': ['resolutions.eventTime','participants.sessions.segments.wrapUpNote','participants.sessions.segments.wrapUpCode','participants.sessions.segments.segmentType','participants.sessions.segments.segmentStart','participants.sessions.segments.segmentEnd','participants.sessions.segments.disconnectType','participants.sessions.metrics.value','participants.sessions.metrics.name','participants.sessions.metrics.emitDate','participants.sessions.mediaEndpointStats.receivedPackets','participants.sessions.mediaEndpointStats.minRFactor','participants.sessions.mediaEndpointStats.minMos','participants.sessions.mediaEndpointStats.maxLatencyMs','participants.sessions.mediaEndpointStats.eventTime','participants.sessions.remote','participants.sessions.mediaType','participants.sessions.dnis','participants.sessions.direction','participants.sessions.ani','participants.sessions.activeSkillIds','participants.userId','participants.purpose','participants.participantName','participants.participantId','originatingDirection','mediaStatsMinConversationRFactor','mediaStatsMinConversationMos','divisionIds','conversationStart','conversationId','conversationEnd']}
 }
 
 kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',

@@ -93,7 +93,7 @@ class API_Genesys():
         # print(df_columns)
 
 
-    def depack_json(self, json, filters=dict()):
+    def depack_json(self, json, filters=dict(), columns=[]):
         # convert json to DataFrame
         try:
             df_lv0 = pd.DataFrame(json).fillna('')
@@ -554,7 +554,7 @@ class API_Genesys():
                     
                     try:
                         response = requests.get(url_iter, headers=headers).json()
-                        df_response = self.depack_json(response['conversations'], {'participants.purpose': 'agent'})
+                        df_response = self.depack_json(response['conversations'], filters={'participants.purpose': 'agent'})
                     except:
                         # print(f"Couldn't get results from: {url_iter}")
                         pass
@@ -581,7 +581,7 @@ class API_Genesys():
         # df.to_csv(f'{from_date[:10]}_data.csv')
 
         self.delete_report(report_type, job)
-        SQLConnection.insert(df, SQL_table, self.API_domain)
+        SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['conversations'])
         
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):

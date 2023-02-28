@@ -2,11 +2,15 @@ import pyodbc
 import time
 
 
-def insert(dataFrame, SQL_Table, API_domain, fromTemp='No'): 
+def insert(dataFrame, SQL_Table, API_domain, columns=None): 
     global cursor
 
     start_time = time.time()
-    
+
+    # select only columns in the SQL table
+    if columns != None:
+        active_columns = [i for i in columns if i in dataFrame.columns]
+        dataFrame = dataFrame[active_columns]
     
     if API_domain == 'therabody':
         Database = 'DbTherabody'
