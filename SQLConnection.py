@@ -1,8 +1,13 @@
 import pyodbc
+import time
 
 
 def insert(dataFrame, SQL_Table, API_domain, fromTemp='No'): 
     global cursor
+
+    start_time = time.time()
+    
+    
     if API_domain == 'therabody':
         Database = 'DbTherabody'
     elif API_domain in ['rootinsurance', 'kustomer']:
@@ -50,6 +55,9 @@ def insert(dataFrame, SQL_Table, API_domain, fromTemp='No'):
         cursor.execute(query, list_values)
 
         list_values = []
+    
+    elapsedTime = time.time() - start_time
+    print(f'Time to insert Data Report: {elapsedTime} Sec') 
     print('Successfull Data insertion')
 
     connection.commit()

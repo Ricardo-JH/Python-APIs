@@ -93,7 +93,7 @@ class API_Genesys():
         # print(df_columns)
 
 
-    def depack_json(self, json):
+    def depack_json(self, json, filters=dict()):
         # convert json to DataFrame
         try:
             df_lv0 = pd.DataFrame(json).fillna('')
@@ -101,7 +101,7 @@ class API_Genesys():
             df_lv0 = pd.DataFrame(pd.json_normalize(json)).fillna('')
         except Exception as e:
             pass
-        print(df_lv0)
+        # print(df_lv0)
 
         # get columns containing json and list data
         columns_containing_json = []
@@ -119,7 +119,7 @@ class API_Genesys():
                     columns_containing_json.append(column)
                     break
 
-        # Convert List to values / Pass to columns_containing_json
+        # Convert List to values / Pass list to columns_containing_json
         if len(columns_containing_list) > 0:
             # access to every column containing list
             for column_list in columns_containing_list:
@@ -137,7 +137,6 @@ class API_Genesys():
             for column_json in columns_containing_json:
                 
                 json_df = pd.DataFrame(df_lv0[column_json].map(dict).values.tolist()).fillna('')
-                # print(json_df)
                 
                 # sort columns
                 json_df = json_df.reindex(sorted(json_df.columns), axis=1)
@@ -152,6 +151,12 @@ class API_Genesys():
                 for column in json_df.columns:
                     df_lv0[f'{column_json}.{column}'] = json_df[column]
         
+        # filter data
+        active_filters = [i for i in filters.keys() if i in df_lv0.columns]
+        if any(active_filters):
+            for filter in active_filters:
+                df_lv0 = df_lv0[df_lv0[filter] == filters[filter]]
+
         # explode to Json values
         if len(columns_to_explode) > 0:
             for column_json in columns_to_explode:
@@ -159,6 +164,7 @@ class API_Genesys():
                 df_lv0 = df_lv0.explode(column_json).reset_index(drop=True)
                 # print(df_lv0)
 
+        # check if still needs cleansing
         columns_containing_json = []
         columns_containing_list = []
 
@@ -169,10 +175,10 @@ class API_Genesys():
             if type(first_element) == dict:
                 columns_containing_json.append(column)
         
-        df_lv0.to_csv('data.csv')
+        # df_lv0.to_csv('data.csv')
         
         if len(columns_containing_json + columns_containing_list) > 0:
-            df_lv0 = self.depack_json(df_lv0)
+            df_lv0 = self.depack_json(df_lv0, filters)
         
         return df_lv0
 
@@ -548,7 +554,7 @@ class API_Genesys():
                     
                     try:
                         response = requests.get(url_iter, headers=headers).json()
-                        df_response = self.depack_json(response['conversations'])
+                        df_response = self.depack_json(response['conversations'], {'participants.purpose': 'agent'})
                     except:
                         print(f"Couldn't get results from: {url_iter}")
                     
@@ -570,16 +576,13 @@ class API_Genesys():
         # elapsedTime = time.time() - start_time
         # start_time = time.time()
         # print(f'Time to get Data Report: {elapsedTime} Sec')
+        # df.to_csv('data.csv')
 
         self.delete_report(report_type, job)
         
-        SQLConnection.insert(df, SQL_table, self.API_domain)
-        elapsedTime = time.time() - start_time
-        start_time = time.time()
-        print(f'Time to insert Data Report: {elapsedTime} Sec')        
+        return df
         
         
-
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
         SQL_tables = []
@@ -617,7 +620,9 @@ class API_Genesys():
                 hours = -8
             else:
                 hours = 0
-
+            
+            df = pd.DataFrame()
+            
             while aux_time <= end_time and aux_time <= now:
                 
                 self.authorize()
@@ -633,14 +638,20 @@ class API_Genesys():
                 if report_types[i] == 'users_presence':
                     self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
                 if report_types[i] == 'conversations':
-                    self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
+                    df_API = self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
+                
+                df = pd.concat([df_API, df.loc[:]]).reset_index(drop=True).fillna('')
+                print(df)
 
                 aux_start_time = aux_start_time + timedelta(days=1)
                 aux_time = aux_start_time + timedelta(days=1)
+            
+            # create Table
+            self.create_table(df, 'conversation')
+            # df.to_csv('data.csv')
+
+            SQLConnection.insert(df, SQL_tables[i], self.API_domain)
 
         print('Finish loading Data\n')
     
-
-        
-
 
