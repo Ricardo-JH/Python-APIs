@@ -521,9 +521,9 @@ class API_Genesys():
 
 
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        # job = self.execute_jobId(report_type, from_date, to_date)
+        job = self.execute_jobId(report_type, from_date, to_date)
         # print(job)
-        job = '133b19eb-6d5e-42fb-9494-07df86fcf69d'
+        # job = '133b19eb-6d5e-42fb-9494-07df86fcf69d'
         url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
         
         df = pd.DataFrame()
@@ -556,7 +556,8 @@ class API_Genesys():
                         response = requests.get(url_iter, headers=headers).json()
                         df_response = self.depack_json(response['conversations'], {'participants.purpose': 'agent'})
                     except:
-                        print(f"Couldn't get results from: {url_iter}")
+                        # print(f"Couldn't get results from: {url_iter}")
+                        pass
                     
                     df = pd.concat([df_response, df.loc[:]]).reset_index(drop=True).fillna('')
 
@@ -576,12 +577,11 @@ class API_Genesys():
         # elapsedTime = time.time() - start_time
         # start_time = time.time()
         # print(f'Time to get Data Report: {elapsedTime} Sec')
-        # df.to_csv('data.csv')
+        
+        # df.to_csv(f'{from_date[:10]}_data.csv')
 
         self.delete_report(report_type, job)
-        
-        return df
-        
+        SQLConnection.insert(df, SQL_table, self.API_domain)
         
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
@@ -621,8 +621,6 @@ class API_Genesys():
             else:
                 hours = 0
             
-            df = pd.DataFrame()
-            
             while aux_time <= end_time and aux_time <= now:
                 
                 self.authorize()
@@ -638,19 +636,10 @@ class API_Genesys():
                 if report_types[i] == 'users_presence':
                     self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
                 if report_types[i] == 'conversations':
-                    df_API = self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
-                
-                df = pd.concat([df_API, df.loc[:]]).reset_index(drop=True).fillna('')
-                print(df)
+                    self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
 
                 aux_start_time = aux_start_time + timedelta(days=1)
                 aux_time = aux_start_time + timedelta(days=1)
-            
-            # create Table
-            self.create_table(df, 'conversation')
-            # df.to_csv('data.csv')
-
-            SQLConnection.insert(df, SQL_tables[i], self.API_domain)
 
         print('Finish loading Data\n')
     
