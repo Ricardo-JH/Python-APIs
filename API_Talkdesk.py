@@ -64,60 +64,64 @@ class API_Talkdesk:
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
-        SQL_tables = []
+        try:
+            SQL_tables = []
 
-        if start_time == None:
-            self.SQLschema = self.SQLschema + 'Temp'
-            end_time = datetime.utcnow() + timedelta(minutes=-1)
-            start_time = end_time + timedelta(days=-days)
-        elif type(start_time) == str:
-            start_time = datetime.fromisoformat(start_time)
-            end_time = datetime.fromisoformat(end_time)
+            if start_time == None:
+                self.SQLschema = self.SQLschema + 'Temp'
+                end_time = datetime.utcnow() + timedelta(minutes=-1)
+                start_time = end_time + timedelta(days=-days)
+            elif type(start_time) == str:
+                start_time = datetime.fromisoformat(start_time)
+                end_time = datetime.fromisoformat(end_time)
 
-        if tables == None:
-            print('No tables introduced')
-            return
-        elif tables == 'All':
-            report_types = self.report_types
-        else:
-            report_types = tables
-
-        for table in report_types:
-            SQL_tables.append(f'[{self.SQLschema}].[{table}]')
-
-        for i in range(len(SQL_tables)):
-            now = datetime.utcnow()
-            
-            aux_start_time = start_time
-
-            aux_time = start_time + timedelta(days=1)
-
-            self.authorize()
-            
-            if 'Temp' in SQL_tables[i]:
-                SQLConnection.truncate(SQL_tables[i], self.API_domain)
-                hours = -8
+            if tables == None:
+                print('No tables introduced')
+                return
+            elif tables == 'All':
+                report_types = self.report_types
             else:
-                hours = 0
+                report_types = tables
 
-            while aux_time <= end_time and aux_time <= now:
+            for table in report_types:
+                SQL_tables.append(f'[{self.SQLschema}].[{table}]')
+
+            for i in range(len(SQL_tables)):
+                now = datetime.utcnow()
                 
+                aux_start_time = start_time
+
+                aux_time = start_time + timedelta(days=1)
+
                 self.authorize()
                 
-                print(f'\n{SQL_tables[i]} {self.API_domain}')
-                print(f'Load until: {end_time + timedelta(hours=hours)}')
-                print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
-                print(self.access_token[-10:-1])
-                
-                job = self.execute_report(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
-                df = self.get_dataReport(report_types[i], job)
-                self.delete_report(report_types[i], job)
-                SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
+                if 'Temp' in SQL_tables[i]:
+                    SQLConnection.truncate(SQL_tables[i], self.API_domain)
+                    hours = -8
+                else:
+                    hours = 0
 
-                aux_start_time = aux_start_time + timedelta(days=1)
-                aux_time = aux_start_time + timedelta(days=1)
+                while aux_time <= end_time and aux_time <= now:
+                    
+                    self.authorize()
+                    
+                    print(f'\n{SQL_tables[i]} {self.API_domain}')
+                    print(f'Load until: {end_time + timedelta(hours=hours)}')
+                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
+                    print(self.access_token[-10:-1])
+                    
+                    job = self.execute_report(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
+                    df = self.get_dataReport(report_types[i], job)
+                    self.delete_report(report_types[i], job)
+                    SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
 
-        print('Finish loading Data\n')
+                    aux_start_time = aux_start_time + timedelta(days=1)
+                    aux_time = aux_start_time + timedelta(days=1)
+
+            print('Finish loading Data\n')
+            return 0
+        except:
+            return 1
 
 
     def execute_report(self, report_type, from_date, to_date):
@@ -219,54 +223,60 @@ class API_Talkdesk:
 
 
     def load_users(self):
-        
-        url = f'{self.base_API}/users'
-        SQL_Table = f'[{self.SQLschema}].[users]'
-        last_page = False
+        try:
+            url = f'{self.base_API}/users'
+            SQL_Table = f'[{self.SQLschema}].[users]'
+            last_page = False
 
-        SQLConnection.truncate(SQL_Table, self.API_domain)
+            SQLConnection.truncate(SQL_Table, self.API_domain)
 
-        while not last_page:
+            while not last_page:
 
-            self.authorize()
-        
-            headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {self.access_token}"
-            }
+                self.authorize()
             
-            start_time = time.time()
-            isValidResponse = False
+                headers = {
+                "accept": "application/json",
+                "Authorization": f"Bearer {self.access_token}"
+                }
+                
+                start_time = time.time()
+                isValidResponse = False
 
-            while not isValidResponse:
-                try:
-
-                    response = requests.get(url, headers=headers).json()
-                    time.sleep(1)
-
-                    df = pd.DataFrame(response).fillna('')
-                    df_users = pd.DataFrame(df['_embedded']['users'])[['id', 'email', 'name', 'active', 'gender', 'extension', 'external_phone_number', 'created_at', 'ring_groups']]
-                    df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
-                    df_users['extension'] = df_users['extension'].map(str)
-
+                while not isValidResponse:
                     try:
-                        url = df['_links']['next']['href']
-                    except KeyError as KeyErr:
-                        url = None
+
+                        response = requests.get(url, headers=headers).json()
+                        time.sleep(1)
+
+                        df = pd.DataFrame(response).fillna('')
+                        df_users = pd.DataFrame(df['_embedded']['users'])[['id', 'email', 'name', 'active', 'gender', 'extension', 'external_phone_number', 'created_at', 'ring_groups']]
+                        df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
+                        df_users['extension'] = df_users['extension'].map(str)
+
+                        try:
+                            url = df['_links']['next']['href']
+                        except KeyError as KeyErr:
+                            url = None
+                            time.sleep(0.5)
+
+                        SQLConnection.insert(df_users, SQL_Table, self.API_domain)
+                        isValidResponse = True
+                        
+                    except:
                         time.sleep(0.5)
+                        elapsedTime = time.time() - start_time
 
-                    SQLConnection.insert(df_users, SQL_Table, self.API_domain)
-                    isValidResponse = True
-                    
-                except:
-                    time.sleep(0.5)
-                    elapsedTime = time.time() - start_time
-
-            elapsedTime = time.time() - start_time
-            print(self.access_token[-10:-1])
-            print(f'Time to get Users Data: {elapsedTime} Sec')
+                elapsedTime = time.time() - start_time
+                print(self.access_token[-10:-1])
+                print(f'Time to get Users Data: {elapsedTime} Sec')
+                
+                if url == None:
+                    last_page = True
             
-            if url == None:
-                last_page = True
+            print('\nFinish Updating Users Data')
 
-        print('\nFinish Updating Users Data')
+            return 0
+        except:
+            return 1
+
+        

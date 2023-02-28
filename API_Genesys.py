@@ -317,29 +317,99 @@ class API_Genesys():
 
 
     def load_schedules(self, op=1):
-        
-        # self.API.load_schedules_activityCodes
-        today = datetime.now().date()
-        start_of_week = today - timedelta(days=today.weekday())
+        try:
+            # self.API.load_schedules_activityCodes
+            today = datetime.now().date()
+            start_of_week = today - timedelta(days=today.weekday())
 
-        for i in range(op):
-            
-            df = pd.DataFrame()
-            SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
-            
-            if op > 1:
-                SQL_Table = SQL_Table.replace('Temp', '')
-            else:
-                SQLConnection.truncate(SQL_Table, self.API_domain)
-            
-            aux_start_of_week = start_of_week
-            LOB_list, schedule_id = self.get_LOB(aux_start_of_week)
-            
-            j = 1
-            
-            for LOB in LOB_list:
-                print(j)
-                url = f'{self.base_API}/workforcemanagement/managementunits/{LOB}/weeks/{aux_start_of_week}/schedules/{schedule_id}'
+            for i in range(op):
+                
+                df = pd.DataFrame()
+                SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
+                
+                if op > 1:
+                    SQL_Table = SQL_Table.replace('Temp', '')
+                else:
+                    SQLConnection.truncate(SQL_Table, self.API_domain)
+                
+                aux_start_of_week = start_of_week
+                LOB_list, schedule_id = self.get_LOB(aux_start_of_week)
+                
+                j = 1
+                
+                for LOB in LOB_list:
+                    print(j)
+                    url = f'{self.base_API}/workforcemanagement/managementunits/{LOB}/weeks/{aux_start_of_week}/schedules/{schedule_id}'
+
+                    self.authorize()
+                
+                    headers = {
+                    "accept": "application/json",
+                    "Authorization": f"Bearer {self.access_token}"
+                    }
+                    
+                    start_time = time.time()
+                    isValidResponse = False
+
+                    while not isValidResponse:
+                        try:
+                            response = requests.get(url, headers=headers).json()
+                            
+                            if pd.DataFrame(response).empty:
+                                break
+
+                            time.sleep(0.5)
+                            
+                            df_schedules = pd.DataFrame(response['result'])[['id', 'weekDate', 'description', 'published', 'userSchedules']].fillna('').iloc[5:]
+                            # print(df_schedules)
+                            df_schedules = df_schedules.reset_index().rename(columns={'index': 'userId', 'id': 'scheduleId'})
+                            
+                            for schedule_i in range(len(df_schedules.axes[0])):
+                                df_schedule_info = df_schedules[['userId', 'scheduleId', 'weekDate', 'description', 'published']].iloc[schedule_i: schedule_i + 1].reset_index(drop=True)
+                                shifts = df_schedules['userSchedules'].iloc[schedule_i]['shifts']
+
+                                for shift in shifts:
+                                    df_shift = pd.DataFrame(shift)
+                                    df_schedule_info['referenceDate'] = df_shift['startDate']
+                                    df_activities = df_shift['activities']
+
+                                    for activity_i in range(len(df_activities.axes[0])):
+                                        activity = df_activities.iloc[activity_i]
+                                        df_activity = pd.DataFrame(activity, index=[0])[['activityCodeId', 'startDate', 'lengthInMinutes', 'countsAsPaidTime']]
+                                        result = pd.concat([df_schedule_info, df_activity], axis=1, join='inner')
+                                        df = pd.concat([result, df.loc[:]]).reset_index(drop=True).fillna('')
+                                        # print(df)
+                        
+                            # print(df)
+                            
+                            isValidResponse = True
+                        except:
+                            time.sleep(0.5)
+                            elapsedTime = time.time() - start_time
+
+                    elapsedTime = time.time() - start_time
+                    print(self.access_token[-10:-1])
+                    print(f'Time to get Schedule {LOB}: {elapsedTime} Sec')
+                    j = j + 1
+                SQLConnection.insert(df, SQL_Table, self.API_domain)
+                print('\nFinish Loading Schedules Data')
+                
+                aux_start_of_week = aux_start_of_week - timedelta(days=7)
+            return 0
+        except:
+            return 1
+
+
+    def load_users(self):
+        try:
+            url = f'{self.base_API}/users'
+            next_url = f'{self.base_API}/users?pageSize=500'
+            SQL_Table = f'[{self.SQLschema}].[users]'
+            last_page = False
+
+            SQLConnection.truncate(SQL_Table, self.API_domain)
+
+            while not last_page:
 
                 self.authorize()
             
@@ -353,109 +423,46 @@ class API_Genesys():
 
                 while not isValidResponse:
                     try:
-                        response = requests.get(url, headers=headers).json()
-                        
-                        if pd.DataFrame(response).empty:
-                            break
+                        # print(url)
+                        print(next_url)
+                        response = requests.get(next_url, headers=headers).json()
+                        time.sleep(1)
+                        # print(response)
+                        df = response['entities']
+                        df_users = pd.DataFrame(df)[['id', 'name', 'email', 'state', 'username', 'version', 'acdAutoAnswer']].fillna('')#
+                        # df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
+                        # df_users['extension'] = df_users['extension'].map(str)
+                        # print(df_users)
+                        try:
+                            next_url = response['nextUri']
+                        except KeyError as KeyErr:
+                            next_url = None
+                            time.sleep(0.5)
 
-                        time.sleep(0.5)
-                        
-                        df_schedules = pd.DataFrame(response['result'])[['id', 'weekDate', 'description', 'published', 'userSchedules']].fillna('').iloc[5:]
-                        # print(df_schedules)
-                        df_schedules = df_schedules.reset_index().rename(columns={'index': 'userId', 'id': 'scheduleId'})
-                        
-                        for schedule_i in range(len(df_schedules.axes[0])):
-                            df_schedule_info = df_schedules[['userId', 'scheduleId', 'weekDate', 'description', 'published']].iloc[schedule_i: schedule_i + 1].reset_index(drop=True)
-                            shifts = df_schedules['userSchedules'].iloc[schedule_i]['shifts']
-
-                            for shift in shifts:
-                                df_shift = pd.DataFrame(shift)
-                                df_schedule_info['referenceDate'] = df_shift['startDate']
-                                df_activities = df_shift['activities']
-
-                                for activity_i in range(len(df_activities.axes[0])):
-                                    activity = df_activities.iloc[activity_i]
-                                    df_activity = pd.DataFrame(activity, index=[0])[['activityCodeId', 'startDate', 'lengthInMinutes', 'countsAsPaidTime']]
-                                    result = pd.concat([df_schedule_info, df_activity], axis=1, join='inner')
-                                    df = pd.concat([result, df.loc[:]]).reset_index(drop=True).fillna('')
-                                    # print(df)
-                    
-                        # print(df)
-                        
+                        SQLConnection.insert(df_users, SQL_Table, self.API_domain)
                         isValidResponse = True
+                        
                     except:
                         time.sleep(0.5)
                         elapsedTime = time.time() - start_time
 
                 elapsedTime = time.time() - start_time
                 print(self.access_token[-10:-1])
-                print(f'Time to get Schedule {LOB}: {elapsedTime} Sec')
-                j = j + 1
-            SQLConnection.insert(df, SQL_Table, self.API_domain)
-            print('\nFinish Loading Schedules Data')
-            
-            aux_start_of_week = aux_start_of_week - timedelta(days=7)
+                print(f'Time to get Users Data: {elapsedTime} Sec')
+                
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/api/v2/users', next_url)
 
-
-    def load_users(self):
-        
-        url = f'{self.base_API}/users'
-        next_url = f'{self.base_API}/users?pageSize=500'
-        SQL_Table = f'[{self.SQLschema}].[users]'
-        last_page = False
-
-        SQLConnection.truncate(SQL_Table, self.API_domain)
-
-        while not last_page:
-
-            self.authorize()
-        
-            headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {self.access_token}"
-            }
-            
-            start_time = time.time()
-            isValidResponse = False
-
-            while not isValidResponse:
-                try:
-                    # print(url)
-                    print(next_url)
-                    response = requests.get(next_url, headers=headers).json()
-                    time.sleep(1)
-                    # print(response)
-                    df = response['entities']
-                    df_users = pd.DataFrame(df)[['id', 'name', 'email', 'state', 'username', 'version', 'acdAutoAnswer']].fillna('')#
-                    # df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
-                    # df_users['extension'] = df_users['extension'].map(str)
-                    # print(df_users)
-                    try:
-                        next_url = response['nextUri']
-                    except KeyError as KeyErr:
-                        next_url = None
-                        time.sleep(0.5)
-
-                    SQLConnection.insert(df_users, SQL_Table, self.API_domain)
-                    isValidResponse = True
-                    
-                except:
-                    time.sleep(0.5)
-                    elapsedTime = time.time() - start_time
-
-            elapsedTime = time.time() - start_time
-            print(self.access_token[-10:-1])
-            print(f'Time to get Users Data: {elapsedTime} Sec')
-            
-            if next_url == None:
-                last_page = True
-            else:
-                next_url = url.replace('/api/v2/users', next_url)
-
-        print('\nFinish Updating Users Data')
+            print('\nFinish Updating Users Data')
+            return 0
+        except:
+            return 1
 
 
     def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
+    
         job = self.execute_jobId(report_type, from_date, to_date)
         url = f'{self.base_API}/analytics/users/details/jobs/{job}'
         
@@ -512,7 +519,7 @@ class API_Genesys():
 
         elapsedTime = time.time() - start_time
         print(f'Time to get Data Report: {elapsedTime} Sec')
-       
+    
         df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
         df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
 
@@ -585,62 +592,65 @@ class API_Genesys():
         
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
-        SQL_tables = []
+        try:
+            SQL_tables = []
 
-        if start_time == None:
-            self.SQLschema = self.SQLschema + 'Temp'
-            end_time = datetime.utcnow() + timedelta(minutes=-1)
-            start_time = end_time + timedelta(days=-days)
-        elif type(start_time) == str:
-            start_time = datetime.fromisoformat(start_time)
-            end_time = datetime.fromisoformat(end_time)
+            if start_time == None:
+                self.SQLschema = self.SQLschema + 'Temp'
+                end_time = datetime.utcnow() + timedelta(minutes=-1)
+                start_time = end_time + timedelta(days=-days)
+            elif type(start_time) == str:
+                start_time = datetime.fromisoformat(start_time)
+                end_time = datetime.fromisoformat(end_time)
 
-        if tables == None:
-            print('No tables introduced')
-            return
-        elif tables == 'All':
-            report_types = self.report_types
-        else:
-            report_types = tables
-
-        for table in report_types:
-            SQL_tables.append(f'[{self.SQLschema}].[{table}]')
-
-        for i in range(len(SQL_tables)):
-            now = datetime.utcnow()
-            
-            aux_start_time = start_time
-
-            aux_time = start_time + timedelta(days=1)
-
-            self.authorize()
-            
-            if 'Temp' in SQL_tables[i]:
-                SQLConnection.truncate(SQL_tables[i], self.API_domain)
-                hours = -8
+            if tables == None:
+                print('No tables introduced')
+                return
+            elif tables == 'All':
+                report_types = self.report_types
             else:
-                hours = 0
-            
-            while aux_time <= end_time and aux_time <= now:
+                report_types = tables
+
+            for table in report_types:
+                SQL_tables.append(f'[{self.SQLschema}].[{table}]')
+
+            for i in range(len(SQL_tables)):
+                now = datetime.utcnow()
                 
+                aux_start_time = start_time
+
+                aux_time = start_time + timedelta(days=1)
+
                 self.authorize()
                 
-                print(f'\n{SQL_tables[i]} {self.API_domain}')
-                print(f'Load until: {end_time + timedelta(hours=hours)}')
-                print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
-                print(self.access_token[-10:-1])
+                if 'Temp' in SQL_tables[i]:
+                    SQLConnection.truncate(SQL_tables[i], self.API_domain)
+                    hours = -8
+                else:
+                    hours = 0
+                
+                while aux_time <= end_time and aux_time <= now:
+                    
+                    self.authorize()
+                    
+                    print(f'\n{SQL_tables[i]} {self.API_domain}')
+                    print(f'Load until: {end_time + timedelta(hours=hours)}')
+                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
+                    print(self.access_token[-10:-1])
 
-                from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
-                to_date = aux_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    to_date = aux_time.strftime('%Y-%m-%dT%H:%M:%S')
 
-                if report_types[i] == 'users_presence':
-                    self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
-                if report_types[i] == 'conversations':
-                    self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
+                    if report_types[i] == 'users_presence':
+                        self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
+                    if report_types[i] == 'conversations':
+                        self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
 
-                aux_start_time = aux_start_time + timedelta(days=1)
-                aux_time = aux_start_time + timedelta(days=1)
+                    aux_start_time = aux_start_time + timedelta(days=1)
+                    aux_time = aux_start_time + timedelta(days=1)
 
-        print('Finish loading Data\n')
-    
+            print('Finish loading Data\n')
+            return 0
+        except:
+            return 1
 
