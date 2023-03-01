@@ -534,12 +534,26 @@ class API_Genesys():
 
     def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date, endpoint="query"):
 
+        metrics = {
+            'participants': ['conversationId'], 
+            'participants.sessions': '', 
+            'participants.sessions.metrics': ['conversationId', 'participants.participantId'], 
+        }
+        
+        segments = {
+            'participants': ['conversationId'], 
+            'participants.sessions': '', 
+            'participants.sessions.segments': ['conversationId', 'participants.participantId']
+        }
+
         offset_30days = (end_time + timedelta(days=-28)).strftime('%Y-%m-%dT%H:%M:%S')
         end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S')
 
         url = f'{self.base_API}/analytics/conversations/details/query'
         
-        df = pd.DataFrame()
+        tables = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
+        names = ['conversations_segments', 'conversations_metrics', 'conversations_participants', 'conversations']
+
         isValidResponse = False
         
         self.authorize()
@@ -572,10 +586,10 @@ class API_Genesys():
             "order": "asc",
             "paging": {
                 "pageSize": 100,
-                "pageNumber": "1"
+                "pageNumber": 1
             }
         }
-
+        
         start_time = time.time()
         
         while not isValidResponse:
@@ -586,17 +600,23 @@ class API_Genesys():
             
             if response['totalHits'] > 0:
                 
-                df_response, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack={'participants': ['conversationId'], 'participants.sessions': '', 'participants.sessions.metrics': ['conversationId', 'participants.participantId']})
-                print(df_response)
-                print(depacked_df_list)
-                # df = pd.concat([df_response, df.loc[:]]).reset_index(drop=True).fillna('')
+                df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
+                df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
                 
-                # SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['conversations'])
-            
-                elapsedTime = time.time() - start_time
-                print(f'Total Time to load Data Report: {elapsedTime} Sec')
+                depacked_df_list.insert(0, df_metrics)
+                depacked_df_list.insert(0, df_segments)
 
+                for i in range(len(depacked_df_list)):
+                    tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
+                
             isValidResponse = True
+        
+        for i in range(len(tables)):
+            print(SQL_table.replace(report_type, names[i]))
+            SQLConnection.insert(tables[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
+    
+        elapsedTime = time.time() - start_time
+        print(f'Total Time to load Data Report: {elapsedTime} Sec')
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):

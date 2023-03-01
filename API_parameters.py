@@ -20,7 +20,48 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
                 'client_secret': 'MKMNw3DtTBWTtLluWMSGGsgmtCA5JTh_z1j2_5BnA6U',
                 'SQLschema': 'Genesys',
                 'report_types': ['users_presence', 'conversations'],
-                'dict_columns': {'conversations': ['resolutions.eventTime','participants.sessions.segments.wrapUpNote','participants.sessions.segments.wrapUpCode','participants.sessions.segments.segmentType','participants.sessions.segments.segmentStart','participants.sessions.segments.segmentEnd','participants.sessions.segments.disconnectType','participants.sessions.metrics.value','participants.sessions.metrics.name','participants.sessions.metrics.emitDate','participants.sessions.mediaEndpointStats.receivedPackets','participants.sessions.mediaEndpointStats.minRFactor','participants.sessions.mediaEndpointStats.minMos','participants.sessions.mediaEndpointStats.maxLatencyMs','participants.sessions.mediaEndpointStats.eventTime','participants.sessions.remote','participants.sessions.mediaType','participants.sessions.dnis','participants.sessions.direction','participants.sessions.ani','participants.sessions.activeSkillIds','participants.userId','participants.purpose','participants.participantName','participants.participantId','originatingDirection','mediaStatsMinConversationRFactor','mediaStatsMinConversationMos','divisionIds','conversationStart','conversationId','conversationEnd']}
+                'dict_columns': {
+                                'conversations_segments': [ 'conversationId', 
+                                                            'participants.participantId',
+                                                            'participants.sessions.segments.disconnectType',
+                                                            'participants.sessions.segments.segmentEnd',
+                                                            'participants.sessions.segments.segmentStart',
+                                                            'participants.sessions.segments.segmentType',
+                                                            'participants.sessions.segments.wrapUpCode',
+                                                            'participants.sessions.segments.wrapUpNote'
+                                ],
+                                'conversations_metrics': [  'conversationId', 
+                                                            'participants.participantId',
+                                                            'participants.sessions.metrics.emitDate',
+                                                            'participants.sessions.metrics.name',
+                                                            'participants.sessions.metrics.value'
+                                ],
+                                'conversations_participants': [
+                                                                'conversationId', 
+                                                                'participants.participantId', 
+                                                                'participants.participantName',
+                                                                'participants.purpose', 
+                                                                'participants.userId',
+                                                                'participants.sessions.activeSkillIds',
+                                                                'participants.sessions.ani',
+                                                                'participants.sessions.direction', 
+                                                                'participants.sessions.dnis',
+                                                                'participants.sessions.flowInType',
+                                                                'participants.sessions.mediaType', 
+                                                                'participants.sessions.remote',
+                                                                'participants.sessions.remoteNameDisplayable'
+                                                                
+                                ],
+                                'conversations': [
+                                                    'conversationId',                                                 
+                                                    'conversationEnd', 
+                                                    'conversationStart', 
+                                                    'divisionIds',
+                                                    'mediaStatsMinConversationMos', 
+                                                    'mediaStatsMinConversationRFactor',
+                                                    'originatingDirection'
+                                ]
+                                }
 }
 
 kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
