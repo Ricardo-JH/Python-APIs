@@ -53,7 +53,7 @@ class API_Genesys():
             #response = requests.post(self.login_API, data=payload, headers=headers)
             #access_token = response.json()['access_token']
             #self.access_token = access_token
-            self.access_token = 'B7a4AL8CagFGgNx7fIC02M7gh6XOt6Okr94lihy1vBbANuzdiV6kKdoUq7wtE2UA1O9Oncu2niIaA4tTRwOilA'
+            self.access_token = 'WzV5BnlPGsJKB-uaxI1WpGakPiSBI1rMn6SjCpq54t1QKhoJbIWgPqgRg0qhF73G-KPAyaybVYrs01Zhxo6qTg'
 
         else:
             access_token_end = time.time()
@@ -93,7 +93,7 @@ class API_Genesys():
         # print(df_columns)
 
 
-    def depack_json(self, json, filters=dict(), columns=[]):
+    def depack_json(self, json, filters=dict(), columns_to_depack=dict(), lis_df=[]):
         # convert json to DataFrame
         try:
             df_lv0 = pd.DataFrame(json).fillna('')
@@ -131,7 +131,7 @@ class API_Genesys():
                         break
                 if has_one_item:
                     df_lv0[column_list] = df_lv0[column_list].explode(column_list)
-        
+        # print(columns_containing_json)
         # convert Json to values
         if len(columns_containing_json) > 0:
             for column_json in columns_containing_json:
@@ -151,6 +151,7 @@ class API_Genesys():
                 for column in json_df.columns:
                     df_lv0[f'{column_json}.{column}'] = json_df[column]
         
+        
         # filter data
         active_filters = [i for i in filters.keys() if i in df_lv0.columns]
         if any(active_filters):
@@ -158,17 +159,21 @@ class API_Genesys():
                 df_lv0 = df_lv0[df_lv0[filter] == filters[filter]]
 
         # explode to Json values
-        if len(columns_to_explode) > 0:
-            for column_json in columns_to_explode:
-                # print(df_lv0)
-                df_lv0 = df_lv0.explode(column_json).reset_index(drop=True)
-                # print(df_lv0)
-
+        active_columns_to_explode = [i for i in columns_to_explode if i in columns_to_depack.keys()]
+        if any(active_columns_to_explode):
+            for column_json in active_columns_to_explode:
+                id = columns_to_depack[column_json]
+                df_remain = df_lv0.loc[:, ~df_lv0.columns.isin([column_json])]
+                df_to_explode = df_lv0[id + [column_json]]
+                lis_df.insert(0, df_remain)
+                df_lv0 = df_to_explode.explode(column_json).reset_index(drop=True)
+        
         # check if still needs cleansing
         columns_containing_json = []
         columns_containing_list = []
 
-        for column in df_lv0.columns:
+        active_columns_to_explode = [i for i in columns_to_depack.keys() if i in df_lv0.columns]
+        for column in active_columns_to_explode:
             first_element = df_lv0[column].iloc[0]
             if type(first_element) == list:
                 columns_containing_list.append(column)
@@ -176,11 +181,11 @@ class API_Genesys():
                 columns_containing_json.append(column)
         
         # df_lv0.to_csv('data.csv')
+
+        if any(columns_containing_json + columns_containing_list):
+            df_lv0, lis_df = self.depack_json(df_lv0, filters, columns_to_depack, lis_df)
         
-        if len(columns_containing_json + columns_containing_list) > 0:
-            df_lv0 = self.depack_json(df_lv0, filters)
-        
-        return df_lv0
+        return df_lv0, lis_df
 
 
     def get_LOB(self, week):
@@ -527,89 +532,91 @@ class API_Genesys():
         self.delete_report(report_type, job)
 
 
-    def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        job = self.execute_jobId(report_type, from_date, to_date)
-        # print(job)
-        # job = '133b19eb-6d5e-42fb-9494-07df86fcf69d'
-        url = f'{self.base_API}/analytics/conversations/details/jobs/{job}'
+    def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date, endpoint="query"):
+
+        offset_30days = (end_time + timedelta(days=-28)).strftime('%Y-%m-%dT%H:%M:%S')
+        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+
+        url = f'{self.base_API}/analytics/conversations/details/query'
         
         df = pd.DataFrame()
         isValidResponse = False
-        cursor = 'init'
-
+        
+        self.authorize()
         headers = {
-        "accept": "application/json",
-        "Authorization": f"Bearer {self.access_token}"
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.access_token}"
+        }
+
+        payload = {
+            "interval": f"{offset_30days}/{end_time}",
+            "segmentFilters": [
+                {
+                "type": "and",
+                "predicates": [
+                    {
+                        "dimension": "purpose",
+                        "value": "agent"
+                    },
+                    {
+                        "dimension": "direction",
+                        "value": "inbound"
+                    },
+                    {
+                        "dimension": "segmentEnd",
+                        "value": f"{from_date}/{to_date}"
+                    }
+                ]
+                }
+            ],
+            "order": "asc",
+            "paging": {
+                "pageSize": 100,
+                "pageNumber": "1"
+            }
         }
 
         start_time = time.time()
-
+        
         while not isValidResponse:
-            while cursor != '':
-                try:
-                    job_status = requests.get(url, headers=headers).json()
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"'Couldn't retrieve Job\n{e}")
+            self.authorize()
+            
+            response = requests.post(url, json=payload, headers=headers).json()
+            time.sleep(0.1)
+            
+            if response['totalHits'] > 0:
+                
+                df_response, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack={'participants': ['conversationId'], 'participants.sessions': '', 'participants.sessions.metrics': ['conversationId', 'participants.participantId']})
+                print(df_response)
+                print(depacked_df_list)
+                # df = pd.concat([df_response, df.loc[:]]).reset_index(drop=True).fillna('')
+                
+                # SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['conversations'])
+            
+                elapsedTime = time.time() - start_time
+                print(f'Total Time to load Data Report: {elapsedTime} Sec')
 
-                if job_status['state'] == 'FULFILLED':
-                    
-                    if cursor != 'init':
-                        url_iter = f'{url}/results?cursor={cursor}'
-                    else:
-                        url_iter = f'{url}/results'
-                    
-                    try:
-                        response = requests.get(url_iter, headers=headers).json()
-                        df_response = self.depack_json(response['conversations'], filters={'participants.purpose': 'agent'})
-                    except:
-                        # print(f"Couldn't get results from: {url_iter}")
-                        pass
-                    
-                    df = pd.concat([df_response, df.loc[:]]).reset_index(drop=True).fillna('')
-
-                    try:
-                        cursor = response['cursor']
-                        # cursor = ''
-                    except:
-                        cursor = ''
             isValidResponse = True
 
-        elapsedTime = time.time() - start_time
-        start_time = time.time()
-        print(f'Time to get Data Report: {elapsedTime} Sec')
 
-        # create Table
-        # self.create_table(df, 'conversation')
-        # elapsedTime = time.time() - start_time
-        # start_time = time.time()
-        # print(f'Time to get Data Report: {elapsedTime} Sec')
-        
-        # df.to_csv(f'{from_date[:10]}_data.csv')
-
-        self.delete_report(report_type, job)
-        SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['conversations'])
-        
-
-    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
-        try:
+    def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
+        # try:
             SQL_tables = []
 
             if start_time == None:
-                self.SQLschema = self.SQLschema + 'Temp'
                 end_time = datetime.utcnow() + timedelta(minutes=-1)
-                start_time = end_time + timedelta(days=-days)
+                start_time = end_time + timedelta(minutes=-offset_minutes)
             elif type(start_time) == str:
                 start_time = datetime.fromisoformat(start_time)
                 end_time = datetime.fromisoformat(end_time)
 
-            if tables == None:
-                print('No tables introduced')
-                return
-            elif tables == 'All':
+            if tables == 'All':
                 report_types = self.report_types
             else:
                 report_types = tables
+            
+            if temp:
+                self.SQLschema = self.SQLschema + 'Temp'
 
             for table in report_types:
                 SQL_tables.append(f'[{self.SQLschema}].[{table}]')
@@ -617,40 +624,33 @@ class API_Genesys():
             for i in range(len(SQL_tables)):
                 now = datetime.utcnow()
                 
-                aux_start_time = start_time
-
-                aux_time = start_time + timedelta(days=1)
-
-                self.authorize()
-                
-                if 'Temp' in SQL_tables[i]:
+                if temp:
                     SQLConnection.truncate(SQL_tables[i], self.API_domain)
-                    hours = -8
+                    hours = 0#-8
                 else:
                     hours = 0
                 
-                while aux_time <= end_time and aux_time <= now:
-                    
-                    self.authorize()
-                    
+                aux_start_time = start_time
+                aux_end_time = start_time + timedelta(minutes=interval_minutes)
+
+                while aux_end_time <= end_time and aux_end_time <= now:
                     print(f'\n{SQL_tables[i]} {self.API_domain}')
                     print(f'Load until: {end_time + timedelta(hours=hours)}')
-                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
-                    print(self.access_token[-10:-1])
+                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_end_time + timedelta(hours=hours)}')
 
                     from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
-                    to_date = aux_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    to_date = aux_end_time.strftime('%Y-%m-%dT%H:%M:%S')
 
                     if report_types[i] == 'users_presence':
                         self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
                     if report_types[i] == 'conversations':
-                        self.load_conversations(report_types[i], SQL_tables[i], from_date, to_date)
+                        self.load_conversations(report_types[i], SQL_tables[i], end_time, from_date, to_date)
 
-                    aux_start_time = aux_start_time + timedelta(days=1)
-                    aux_time = aux_start_time + timedelta(days=1)
-
+                    aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
+                    aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
+                    
             print('Finish loading Data\n')
-            return 0
-        except:
-            return 1
+        #     return 0
+        # except:
+        #     return 1
 
