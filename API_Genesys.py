@@ -124,13 +124,24 @@ class API_Genesys():
             # access to every column containing list
             for column_list in columns_containing_list:
                 has_one_item = True
+                
+            
                 for i in range(df_lv0[column_list].shape[0]):
                     if len(df_lv0[column_list].iloc[i]) > 1:
-                        has_one_item = False
-                        columns_to_explode.append(column_list)
-                        break
+                        id = columns_to_depack.get(column_list)
+                        # check if column is asked to be exploded
+                        if id != '':
+                            has_one_item = False
+                            columns_to_explode.append(column_list)
+                            break
+                        # column doesnt need to be exploded. Get first item
+                        # else:
+                        #     print(len(df_lv0[column_list].iloc[i]))
+                        #     print(df_lv0[column_list].iloc[i])
                 if has_one_item:
                     df_lv0[column_list] = df_lv0[column_list].explode(column_list)
+
+
         # print(columns_containing_json)
         # convert Json to values
         if len(columns_containing_json) > 0:
@@ -532,7 +543,7 @@ class API_Genesys():
         self.delete_report(report_type, job)
 
 
-    def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date, endpoint="query"):
+    def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date):
 
         metrics = {
             'participants': ['conversationId'], 
@@ -598,8 +609,11 @@ class API_Genesys():
             response = requests.post(url, json=payload, headers=headers).json()
             time.sleep(0.1)
             
-            if response['totalHits'] > 0:
-                
+            pages = round(response['totalHits'] / 100)
+            cur_page = 1
+            while pages > 0 and cur_page <= pages:
+                print(cur_page, sep='  ', end=' ', flush=True)
+                response = requests.post(url, json=payload, headers=headers).json()
                 df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
                 df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
                 
@@ -609,10 +623,17 @@ class API_Genesys():
                 for i in range(len(depacked_df_list)):
                     tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
                 
+                cur_page += 1
+                payload['paging']['pageNumber'] = str(cur_page)
             isValidResponse = True
-        
+        print('\n')
         for i in range(len(tables)):
+            
             print(SQL_table.replace(report_type, names[i]))
+            
+            if 'Temp' in SQL_table: 
+                SQLConnection.truncate(SQL_table.replace(report_type, names[i]), self.API_domain)
+                
             SQLConnection.insert(tables[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
     
         elapsedTime = time.time() - start_time
@@ -645,8 +666,8 @@ class API_Genesys():
                 now = datetime.utcnow()
                 
                 if temp:
-                    SQLConnection.truncate(SQL_tables[i], self.API_domain)
-                    hours = 0#-8
+                    
+                    hours = -8
                 else:
                     hours = 0
                 

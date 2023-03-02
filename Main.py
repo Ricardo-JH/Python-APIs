@@ -6,7 +6,7 @@ ultra = API('ultra')
 
 # ultra.API.load_users()
 # ultra.API.load_schedules_activityCodes()
-ultra.API.load_data(['conversations'], True, offset_minutes=1440, interval_minutes=1440)
+ultra.API.load_data(['conversations'], True, interval_minutes=1440, start_time='2023-02-27T08:00:00', end_time='2023-02-28T08:00:00')
 
 
 # while True:
