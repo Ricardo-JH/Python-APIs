@@ -50,10 +50,10 @@ class API_Genesys():
         
         if self.access_token_startTime == None:
             self.access_token_startTime = time.time()
-            #response = requests.post(self.login_API, data=payload, headers=headers)
-            #access_token = response.json()['access_token']
-            #self.access_token = access_token
-            self.access_token = 'WzV5BnlPGsJKB-uaxI1WpGakPiSBI1rMn6SjCpq54t1QKhoJbIWgPqgRg0qhF73G-KPAyaybVYrs01Zhxo6qTg'
+            response = requests.post(self.login_API, data=payload, headers=headers)
+            access_token = response.json()['access_token']
+            self.access_token = access_token
+            # self.access_token = 'WzV5BnlPGsJKB-uaxI1WpGakPiSBI1rMn6SjCpq54t1QKhoJbIWgPqgRg0qhF73G-KPAyaybVYrs01Zhxo6qTg'
 
         else:
             access_token_end = time.time()
