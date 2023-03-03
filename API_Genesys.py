@@ -612,6 +612,7 @@ class API_Genesys():
             pages = round(response['totalHits'] / 100)
             cur_page = 1
             while pages > 0 and cur_page <= pages:
+                self.authorize()
                 print(cur_page, sep='  ', end=' ', flush=True)
                 response = requests.post(url, json=payload, headers=headers).json()
                 df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
