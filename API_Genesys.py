@@ -215,6 +215,7 @@ class API_Genesys():
 
         while not isValidResponse:
             try:
+                self.authorize()
                 response = requests.get(url, headers=headers).json()
 
                 response = response['entities']
@@ -242,7 +243,8 @@ class API_Genesys():
     def execute_jobId(self, report_type, from_date, to_date):
 
         isValidResponse = False
-        
+        self.authorize()
+
         url = f'{self.base_API}/analytics/{report_type}/details/jobs'
         url = url.replace('users_presence', 'users')
         
@@ -260,6 +262,7 @@ class API_Genesys():
         
         while not isValidResponse:
             try:
+                self.authorize()
                 response = requests.post(url, json=payload, headers=headers).json()
                 time.sleep(0.5)
                 job_ID = response['jobId']
@@ -279,7 +282,7 @@ class API_Genesys():
         url = f'{self.base_API}/{report_type}/details/jobs/{job_ID}'
         url = url.replace('users_presence', 'analytics/users')
         url = url.replace('users_routingStatus', 'analytics/users')
-
+        self.authorize()
         headers = {
         "accept": "application/json",
         "Authorization": f"Bearer {self.access_token}"
@@ -313,6 +316,7 @@ class API_Genesys():
 
         while not isValidResponse:
             try:
+                self.authorize()
                 response = requests.get(url, headers=headers).json()
                 time.sleep(0.5)
                 df = pd.DataFrame(response['entities']).fillna('')
@@ -369,6 +373,7 @@ class API_Genesys():
 
                     while not isValidResponse:
                         try:
+                            self.authorize()
                             response = requests.get(url, headers=headers).json()
                             
                             if pd.DataFrame(response).empty:
@@ -439,6 +444,7 @@ class API_Genesys():
 
                 while not isValidResponse:
                     try:
+                        self.authorize()
                         # print(url)
                         print(next_url)
                         response = requests.get(next_url, headers=headers).json()
@@ -478,7 +484,7 @@ class API_Genesys():
 
 
     def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
-    
+        
         job = self.execute_jobId(report_type, from_date, to_date)
         url = f'{self.base_API}/analytics/users/details/jobs/{job}'
         
@@ -496,11 +502,12 @@ class API_Genesys():
         while not isValidResponse:
             while cursor != '':
                 try:
+                    self.authorize()
                     job_status = requests.get(url, headers=headers).json()
                     time.sleep(1)
                 except Exception as e:
                     print(f"'Couldn't retrieve Job\n{e}")
-
+                
                 if job_status['state'] == 'FULFILLED':
                     
                     if cursor != 'init':
@@ -538,9 +545,13 @@ class API_Genesys():
     
         df['users_presence_id'] = df['userId'] + ' ' + df['startTime'].astype(str)
         df['endTime'] = df['endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
+        
+        self.delete_report(report_type, job)
+
+        if 'Temp' in SQL_table: 
+            SQLConnection.truncate(SQL_table, self.API_domain)
 
         SQLConnection.insert(df, SQL_table, self.API_domain)
-        self.delete_report(report_type, job)
 
 
     def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date):
