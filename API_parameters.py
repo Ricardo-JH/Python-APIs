@@ -58,6 +58,13 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
                                                     'mediaStatsMinConversationMos', 
                                                     'mediaStatsMinConversationRFactor',
                                                     'originatingDirection'
+                                ],
+                                'users_presence': [
+                                                    'users_presence_id',
+                                                    'userId',                                                 
+                                                    'primaryPresence.startTime', 
+                                                    'primaryPresence.endTime', 
+                                                    'primaryPresence.systemPresence'
                                 ]
                                 }
 }

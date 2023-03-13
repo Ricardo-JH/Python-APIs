@@ -483,7 +483,7 @@ class API_Genesys():
             return 1
 
 
-    def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
+    def load_usersPresence_jobID(self, report_type, SQL_table, from_date, to_date):
         
         job = self.execute_jobId(report_type, from_date, to_date)
         url = f'{self.base_API}/analytics/users/details/jobs/{job}'
@@ -552,6 +552,107 @@ class API_Genesys():
             SQLConnection.truncate(SQL_table, self.API_domain)
 
         SQLConnection.insert(df, SQL_table, self.API_domain)
+
+    
+    def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
+
+        userDetails = {
+            'primaryPresence': ['userId']
+        }
+        
+        url = f'{self.base_API}/analytics/users/details/query'
+        
+        df = pd.DataFrame()
+        names = ['usersPresence']
+
+        isValidResponse = False
+        
+        self.authorize()
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.access_token}"
+        }
+
+        payload = {
+            "interval": f"{from_date}/{to_date}",
+            "presenceFilters": [
+                {
+                    "type": "or",
+                    "predicates": [
+                        {
+                            "dimension": "systemPresence",
+                            "value": "AVAILABLE"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "AWAY"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "BREAK"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "BUSY"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "MEAL"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "ON_QUEUE"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "TRAINNING"
+                        }
+                    ]
+                }
+            ],
+            "paging": {
+                "pageSize": 100,
+                "pageNumber": 1
+            },
+            "order": "asc"
+        }
+        
+        start_time = time.time()
+        
+        while not isValidResponse:
+            self.authorize()
+            
+            response = requests.post(url, json=payload, headers=headers).json()
+            time.sleep(0.1)
+            
+            pages = round(response['totalHits'] / 100)
+            print(pages)
+            cur_page = 1
+            while pages > 0 and cur_page <= pages:
+                self.authorize()
+                print(cur_page, sep='  ', end=' ', flush=True)
+                response = requests.post(url, json=payload, headers=headers).json()
+                df_usersPresence, _ = self.depack_json(response['userDetails'], columns_to_depack=userDetails, lis_df=[])
+                # depacked_df_list.insert(0, df_usersPresence)
+
+                df = pd.concat([df_usersPresence, df.loc[:]]).reset_index(drop=True).fillna('')
+                
+                cur_page += 1
+                payload['paging']['pageNumber'] = str(cur_page)
+
+            isValidResponse = True
+        print('\n')
+
+        df['users_presence_id'] = df['userId'] + ' ' + df['primaryPresence.startTime'].astype(str)
+        df['primaryPresence.endTime'] = df['primaryPresence.endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
+
+        if 'Temp' in SQL_table: 
+            SQLConnection.truncate(SQL_table, self.API_domain)
+            
+        SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns'][report_type])
+    
+        elapsedTime = time.time() - start_time
+        print(f'Total Time to load Data Report: {elapsedTime} Sec')
 
 
     def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date):
