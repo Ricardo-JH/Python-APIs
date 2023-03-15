@@ -1,5 +1,34 @@
+import pandas as pd
 import pyodbc
 import time
+
+
+def select(API_domain, query): 
+    start_time = time.time()
+
+    if API_domain == 'therabody':
+        Database = 'DbTherabody'
+    elif API_domain in ['rootinsurance', 'kustomer']:
+        Database = 'RootInsurance'
+    elif API_domain == 'ultra':
+        Database = 'Ultra'
+
+    Driver = 'ODBC Driver 17 for SQL Server'
+    Server = 'SQLSERVER\GGAMASTEDDB'
+    User = 'GGASOLUTIONS\ricardo.jaramillo'
+    Connection_String = f'DRIVER={Driver};SERVER={Server};DATABASE={Database};UID={User};Trusted_Connection=yes;'
+
+    connection = pyodbc.connect(Connection_String)
+
+    data = pd.DataFrame(pd.read_sql(query, connection)).fillna('')
+    # data = data[['Emp', 'schedule_referenceDate_TRESS', 'schedule_daily_Genesys']]
+    
+    elapsedTime = time.time() - start_time
+    print(f'Time get data: {elapsedTime} sec')
+    print(data)
+
+    connection.close()
+    return data
 
 
 def insert(dataFrame, SQL_Table, API_domain, columns=None): 
