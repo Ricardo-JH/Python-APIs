@@ -565,7 +565,7 @@ class API_Genesys():
             df = pd.DataFrame()
             names = ['usersPresence']
 
-            isValidResponse = False
+            # isValidResponse = False
             
             self.authorize()
             headers = {
@@ -619,30 +619,30 @@ class API_Genesys():
             
             start_time = time.time()
             
-            while not isValidResponse:
+            # while not isValidResponse:
+            self.authorize()
+            
+            response = requests.post(url, json=payload, headers=headers).json()
+            time.sleep(0.1)
+            
+            pages = round(response['totalHits'] / 100)
+            print(pages)
+            cur_page = 1
+            while pages > 0 and cur_page <= pages:
                 self.authorize()
-                
+                print(cur_page, sep='  ', end=' ', flush=True)
                 response = requests.post(url, json=payload, headers=headers).json()
-                time.sleep(0.1)
+                df_usersPresence, _ = self.depack_json(response['userDetails'], columns_to_depack=userDetails, lis_df=[])
+                # depacked_df_list.insert(0, df_usersPresence)
+
+                df = pd.concat([df_usersPresence, df.loc[:]]).reset_index(drop=True).fillna('')
                 
-                pages = round(response['totalHits'] / 100)
-                print(pages)
-                cur_page = 1
-                while pages > 0 and cur_page <= pages:
-                    self.authorize()
-                    print(cur_page, sep='  ', end=' ', flush=True)
-                    response = requests.post(url, json=payload, headers=headers).json()
-                    df_usersPresence, _ = self.depack_json(response['userDetails'], columns_to_depack=userDetails, lis_df=[])
-                    # depacked_df_list.insert(0, df_usersPresence)
+                cur_page += 1
+                payload['paging']['pageNumber'] = str(cur_page)
 
-                    df = pd.concat([df_usersPresence, df.loc[:]]).reset_index(drop=True).fillna('')
-                    
-                    cur_page += 1
-                    payload['paging']['pageNumber'] = str(cur_page)
-
-                isValidResponse = True
+                # isValidResponse = True
             print('\n')
-
+            
             df['users_presence_id'] = df['userId'] + ' ' + df['primaryPresence.startTime'].astype(str)
             df['primaryPresence.endTime'] = df['primaryPresence.endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
 
@@ -680,7 +680,7 @@ class API_Genesys():
         tables = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
         names = ['conversations_segments', 'conversations_metrics', 'conversations_participants', 'conversations']
 
-        isValidResponse = False
+        # isValidResponse = False
         
         self.authorize()
         headers = {
@@ -718,31 +718,31 @@ class API_Genesys():
         
         start_time = time.time()
         
-        while not isValidResponse:
+        # while not isValidResponse:
+        self.authorize()
+        
+        response = requests.post(url, json=payload, headers=headers).json()
+        time.sleep(0.1)
+        
+        pages = round(response['totalHits'] / 100)
+        cur_page = 1
+        print(pages)
+        while pages > 0 and cur_page <= pages:
             self.authorize()
-            
+            print(cur_page, sep='  ', end=' ', flush=True)
             response = requests.post(url, json=payload, headers=headers).json()
-            time.sleep(0.1)
+            df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
+            df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
             
-            pages = round(response['totalHits'] / 100)
-            cur_page = 1
-            print(pages)
-            while pages > 0 and cur_page <= pages:
-                self.authorize()
-                print(cur_page, sep='  ', end=' ', flush=True)
-                response = requests.post(url, json=payload, headers=headers).json()
-                df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
-                df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
-                
-                depacked_df_list.insert(0, df_metrics)
-                depacked_df_list.insert(0, df_segments)
+            depacked_df_list.insert(0, df_metrics)
+            depacked_df_list.insert(0, df_segments)
 
-                for i in range(len(depacked_df_list)):
-                    tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
-                
-                cur_page += 1
-                payload['paging']['pageNumber'] = str(cur_page)
-            isValidResponse = True
+            for i in range(len(depacked_df_list)):
+                tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
+            
+            cur_page += 1
+            payload['paging']['pageNumber'] = str(cur_page)
+            # isValidResponse = True
         print('\n')
         for i in range(len(tables)):
             
