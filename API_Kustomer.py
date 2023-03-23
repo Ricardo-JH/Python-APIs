@@ -1,9 +1,16 @@
-from API_parameters import kustomer_dic
 from datetime import datetime, timedelta
+from API_parameters import kustomer_dic
+from warnings import simplefilter
 import SQLConnection
 import pandas as pd
+import numpy as np
 import requests
+import base64
 import time
+import csv
+
+
+simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 
 class API_Kustomer:
@@ -28,185 +35,274 @@ class API_Kustomer:
             self.API_key = kustomer_dic['API_key']
 
 
-    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
-        SQL_tables = []
-
-        if start_time == None:
-            self.SQLschema = self.SQLschema + 'Temp'
-            end_time = datetime.utcnow() + timedelta(minutes=-1)
-            start_time = end_time + timedelta(days=-days)
-        elif type(start_time) == str:
-            start_time = datetime.fromisoformat(start_time)
-            end_time = datetime.fromisoformat(end_time)
-
-        if tables == None:
-            print('No tables introduced')
-            return
-        elif tables == 'All':
-            report_types = self.report_types
-        else:
-            report_types = tables
-
-        for table in report_types:
-            SQL_tables.append(f'[{self.SQLschema}].[{table}]')
-
-        for i in range(len(SQL_tables)):
-            now = datetime.utcnow()
-            
-            aux_start_time = start_time
-
-            aux_time = start_time + timedelta(days=1)
-
-            # self.authorize()
-            
-            if 'Temp' in SQL_tables[i]:
-                SQLConnection.truncate(SQL_tables[i], self.API_domain)
-                hours = -8
-            else:
-                hours = 0
-
-            while aux_time <= end_time and aux_time <= now:
-                
-                # self.authorize()
-                
-                print(f'\n{SQL_tables[i]} {self.API_domain}')
-                print(f'Load until: {end_time + timedelta(hours=hours)}')
-                print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_time + timedelta(hours=hours)}')
-                
-                df = self.get_dataReport(report_types[i], aux_start_time.strftime('%Y-%m-%dT%H:%M:%S'), aux_time.strftime('%Y-%m-%dT%H:%M:%S'))
-                return
-                SQLConnection.insert(df, SQL_tables[i], self.API_domain)                
-
-                aux_start_time = aux_start_time + timedelta(days=1)
-                aux_time = aux_start_time + timedelta(days=1)
-
-        print('Finish loading Data\n')
-   
-
-    def get_dataReport(self, report_type, from_date, to_date):
-        isValidResponse = False
-        
-        url = f'{self.search_API}?pageSize=500'
-        
-        headers = {
-        "accept": "application/json",
-        "Authorization": f"Bearer {self.API_key}"
-        }
-
-        payload = {
-        "and": [
-            { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
-            { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
-        ],
-        "sort" : [{f"{report_type}_updated_at": "asc"}],
-        "queryContext": f"{report_type}",
-        "or":[]
-        }
-
-        start_time = time.time()
-        
-        while not isValidResponse:
-            # try:
-                response = requests.post(url, json=payload, headers=headers).json()
-                time.sleep(0.5)
-                               
-                df_response = pd.DataFrame(response['data'])
-                nest_url = response['links']['next']
-                
-                return
-                df_entries = df_entries.loc[:, df_entries.columns != 'calls_historical_base.data_status'] #[['interaction_id', 'call_type', 'start_time', 'end_time','talkdesk_phone_number', 'customer_phone_number', 'talk_time', 'record','hangup', 'in_business_hours?', 'callback_from_queue?', 'waiting_time','agent_speed_to_answer', 'holding_time', 'rating', 'description','agent_name', 'phone_display_name', 'disposition_code', 'transfer?','handling_agent', 'tags', 'ivr_options', 'csat_score','csat_survey_time', 'team', 'rating_reason', 'agent_disconnected']]
-                df = df_entries.fillna('')
-                # print(df.columns)
-                
-                if self.API_domain == 'rootinsurance':
-                    try:
-                        if report_type == 'user_status':
-                            df['user_status_id'] = df['user_id'] + ' ' + df['status_start_at'].astype(str)
-                        if report_type == 'adherence':
-                            df['adherence_id'] = df['agent_name'] + ' ' + df['adherence_event_start_time'].astype(str)
-                        if report_type == 'feedback_flow':
-                            df.rename(columns= {'ring\xa0group': 'ring group'}, inplace=True)
-                        # print(df)
-                        # print(df.columns)
-                    except KeyError as e:
-                        pass
-
-                isValidResponse = True
-            # except:
-                # print(response)
-                time.sleep(0.5)
-        return
-        elapsedTime = time.time() - start_time
-        print(f'Time to get Data Report: {elapsedTime} Sec')
-        return df
-
-
-    def delete_report(self, report_type, job_ID):
-
-        url = f'{self.base_API}/data/reports/{report_type}/files/{job_ID}'
-
-        headers = {
-        "accept": "application/json",
-        "Authorization": f"Bearer {self.access_token}"
-        }
-
+    def depack_json(self, json, filters=dict(), columns_to_depack=dict(), lis_df=[]):
+        # convert json to DataFrame
         try:
-            requests.delete(url, headers=headers)
-            print(f'Job ID {job_ID} deleted')
+            df_lv0 = pd.DataFrame(json).fillna('')
+        except ValueError:
+            df_lv0 = pd.DataFrame(pd.json_normalize(json)).fillna('')
         except Exception as e:
-            print(f'Job ID {job_ID} could not be deleted')
-            print(f'{e.__class__} occurred{e}')
+            pass
+        # print(df_lv0)
 
+        # get columns containing json and list data
+        columns_containing_json = []
+        columns_containing_list = []
+        columns_to_explode = []
+
+        for column in df_lv0.columns:
+            for i in range(df_lv0[column].shape[0]):
+                element = df_lv0[column].iloc[i]
+                # print(column, ' ', element)
+                if type(element) == list:
+                    columns_containing_list.append(column)
+                    break
+                if type(element) == dict:
+                    columns_containing_json.append(column)
+                    break
+
+        # Convert List to values / Pass list to columns_containing_json
+        if len(columns_containing_list) > 0:
+            # access to every column containing list
+            for column_list in columns_containing_list:
+                has_one_item = True
+                
+            
+                for i in range(df_lv0[column_list].shape[0]):
+                    if len(df_lv0[column_list].iloc[i]) > 1:
+                        id = columns_to_depack.get(column_list)
+                        # check if column is asked to be exploded
+                        if id != '':
+                            has_one_item = False
+                            columns_to_explode.append(column_list)
+                            break
+                        # column doesnt need to be exploded. Get first item
+                        # else:
+                        #     print(len(df_lv0[column_list].iloc[i]))
+                        #     print(df_lv0[column_list].iloc[i])
+                if has_one_item:
+                    df_lv0[column_list] = df_lv0[column_list].explode(column_list)
+
+
+        # print(columns_containing_json)
+        # convert Json to values
+        if len(columns_containing_json) > 0:
+            for column_json in columns_containing_json:
+                
+                json_df = pd.DataFrame(df_lv0[column_json].map(dict).values.tolist()).fillna('')
+                
+                # sort columns
+                json_df = json_df.reindex(sorted(json_df.columns), axis=1)
+
+                # drop duplicated columns
+                columns = json_df.columns.str.lower().str.strip()
+                duplicate_columns = json_df.columns[columns.duplicated()]
+                # print(duplicate_columns)
+                json_df.drop(columns=duplicate_columns, inplace=True)
+                df_lv0.drop(columns=[column_json], inplace=True)
+
+                for column in json_df.columns:
+                    df_lv0[f'{column_json}.{column}'] = json_df[column]
+        
+        
+        # filter data
+        active_filters = [i for i in filters.keys() if i in df_lv0.columns]
+        if any(active_filters):
+            for filter in active_filters:
+                df_lv0 = df_lv0[df_lv0[filter] == filters[filter]]
+
+        # explode to Json values
+        active_columns_to_explode = [i for i in columns_to_explode if i in columns_to_depack.keys()]
+        if any(active_columns_to_explode):
+            for column_json in active_columns_to_explode:
+                id = columns_to_depack[column_json]
+                df_remain = df_lv0.loc[:, ~df_lv0.columns.isin([column_json])]
+                df_to_explode = df_lv0[id + [column_json]]
+                lis_df.insert(0, df_remain.fillna(''))
+                df_lv0 = df_to_explode.explode(column_json).reset_index(drop=True)
+        
+        # check if still needs cleansing
+        columns_containing_json = []
+        columns_containing_list = []
+
+        active_columns_to_explode = [i for i in columns_to_depack.keys() if i in df_lv0.columns]
+        for column in active_columns_to_explode:
+            first_element = df_lv0[column].iloc[0]
+            if type(first_element) == list:
+                columns_containing_list.append(column)
+            if type(first_element) == dict:
+                columns_containing_json.append(column)
+        
+        # df_lv0.to_csv('data.csv')
+
+        if any(columns_containing_json + columns_containing_list):
+            df_lv0, lis_df = self.depack_json(df_lv0, filters, columns_to_depack, lis_df)
+        
+        return df_lv0.fillna(''), lis_df
+    
 
     def load_users(self):
-        
-        url = f'{self.base_API}/users'
-        SQL_Table = f'[{self.SQLschema}].[users]'
-        last_page = False
+        try:
+            url = f'{self.base_API}/users'
+            next_url = f'{self.base_API}/users?pageSize=1000'
+            SQL_Table = f'[{self.SQLschema}].[users]'
+            last_page = False
 
-        SQLConnection.truncate(SQL_Table, self.API_domain)
+            users = {
+                'attributes': ['id'] 
+            }
 
-        while not last_page:
+            SQLConnection.truncate(SQL_Table, self.API_domain)
 
-            self.authorize()
-        
+            while not last_page:
+
+                headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.API_key}"
+                }
+                
+                start_time = time.time()
+
+                # print(url)
+                print(next_url)
+                response = requests.get(next_url, headers=headers).json()
+
+                df_response, _ = self.depack_json(response['data'], columns_to_depack=users, lis_df=[])
+
+                try:
+                    next_url = response['links']['next']
+                except KeyError as KeyErr:
+                    next_url = None
+                    time.sleep(0.5)
+
+                elapsedTime = time.time() - start_time
+                print(f'Time to get Users Data: {elapsedTime} Sec')
+
+                SQLConnection.insert(df_response, SQL_Table, self.API_domain, columns=kustomer_dic['dict_columns']['users'])
+                
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/v1/users', next_url)
+                
+            print('\nFinish Updating Users Data')
+            return 0
+        except:
+            return 1
+
+
+    def load_conversations(self, report_type, SQL_table, from_date, to_date):
+        # try:
+            url = f'{self.search_API}'
+            next_url = f'{self.search_API}?pageSize=500&page=1'
+            last_page = False
+
+            conversation_attributes = {
+                'attributes': ['id'],
+                'attributes.channels': '',
+                'attributes.firstDone.assignedUsers': '',
+                'relationships.conversation': '',
+                'relationships.conversation.data': ''
+            }
+
             headers = {
-            "accept": "application/json",
-            "Authorization": f"Bearer {self.access_token}"
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.API_key}"
             }
             
+            payload = {
+                "and": [
+                    { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
+                    { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
+                ],
+                "sort" : [{f"{report_type}_updated_at": "desc"}],
+                "queryContext": f"{report_type}",
+                "or":[]
+            }
+
+            if 'Temp' in SQL_table: 
+                SQLConnection.truncate(SQL_table, self.API_domain)
+
+            print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
-            isValidResponse = False
 
-            while not isValidResponse:
+            while not last_page:
+                response = requests.post(next_url, headers=headers, json=payload).json()
+                print(next_url[-2:].replace('=', ''), sep='  ', end=' ', flush=True)
+                
+                df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+
                 try:
-
-                    response = requests.get(url, headers=headers).json()
-                    time.sleep(1)
-
-                    df = pd.DataFrame(response).fillna('')
-                    df_users = pd.DataFrame(df['_embedded']['users'])[['id', 'email', 'name', 'active', 'gender', 'extension', 'external_phone_number', 'created_at', 'ring_groups']]
-                    df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
-                    df_users['extension'] = df_users['extension'].map(str)
-
-                    try:
-                        url = df['_links']['next']['href']
-                    except KeyError as KeyErr:
-                        url = None
-                        time.sleep(0.5)
-
-                    SQLConnection.insert(df_users, SQL_Table, self.API_domain)
-                    isValidResponse = True
-                    
-                except:
+                    next_url = response['links']['next']
+                except KeyError as KeyErr:
+                    next_url = None
                     time.sleep(0.5)
-                    elapsedTime = time.time() - start_time
+                
+                SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns'][report_type])
 
-            elapsedTime = time.time() - start_time
-            print(self.access_token[-10:-1])
-            print(f'Time to get Users Data: {elapsedTime} Sec')
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/v1/customers/search', next_url)
             
-            if url == None:
-                last_page = True
+            elapsedTime = time.time() - start_time
+            print(f'\nTime to get Data: {elapsedTime} Sec')
+            
+            print(f'\nFinish Updating {report_type}')
+        #     return 0
+        # except:
+        #     return 1
 
-        print('\nFinish Updating Users Data')
+
+    def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
+        # try:
+            SQL_tables = []
+
+            if start_time == None:
+                end_time = datetime.utcnow() + timedelta(minutes=-1)
+                start_time = end_time + timedelta(minutes=-offset_minutes)
+            elif type(start_time) == str:
+                start_time = datetime.fromisoformat(start_time)
+                end_time = datetime.fromisoformat(end_time)
+
+            if tables == 'All':
+                report_types = self.report_types
+            else:
+                report_types = tables
+            
+            if temp:
+                self.SQLschema = self.SQLschema + 'Temp'
+
+            for table in report_types:
+                SQL_tables.append(f'[{self.SQLschema}].[{table}]')
+
+            for i in range(len(SQL_tables)):
+                now = datetime.utcnow()
+                
+                if temp:
+                    
+                    hours = -8
+                else:
+                    hours = 0
+                
+                aux_start_time = start_time
+                aux_end_time = start_time + timedelta(minutes=interval_minutes)
+
+                while aux_end_time <= end_time and aux_end_time <= now:
+                    print(f'\n{SQL_tables[i]} {self.API_domain}')
+                    print(f'Load until: {end_time + timedelta(hours=hours)}')
+                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_end_time + timedelta(hours=hours)}')
+
+                    from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    to_date = aux_end_time.strftime('%Y-%m-%dT%H:%M:%S')
+
+                    self.load_conversations(report_types[i], SQL_tables[i], from_date=from_date, to_date=to_date)
+
+                    aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
+                    aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
+                    
+            print('Finish loading Data\n')
+        #     return 0
+        # except:
+        #     return 1
+

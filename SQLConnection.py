@@ -52,9 +52,8 @@ def insert(dataFrame, SQL_Table, API_domain, columns=None):
     Server = 'SQLSERVER\GGAMASTEDDB'
     # Database = 'RootInsurance'
     User = 'GGASOLUTIONS\ricardo.jaramillo'
-    Password = 'Ab12345*'
 
-    Connection_String = f'DRIVER={Driver};SERVER={Server};DATABASE={Database};UID={User};PWD={Password};Trusted_Connection=yes;'
+    Connection_String = f'DRIVER={Driver};SERVER={Server};DATABASE={Database};UID={User};Trusted_Connection=yes;'# PWD={Password};
 
     # Trusted Connection to Named Instance
     connection = pyodbc.connect(Connection_String)
@@ -90,8 +89,8 @@ def insert(dataFrame, SQL_Table, API_domain, columns=None):
         list_values = []
     
     elapsedTime = time.time() - start_time
-    print(f'Time to insert Data Report: {elapsedTime} Sec') 
-    print('Successfull Data insertion')
+    # print(f'Time to insert Data Report: {elapsedTime} Sec') 
+    # print('Successfull Data insertion')
 
     connection.commit()
     cursor.close()
