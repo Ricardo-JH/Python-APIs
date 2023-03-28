@@ -84,6 +84,7 @@ def insert(dataFrame, SQL_Table, API_domain, columns=None):
                 # print(f'Item: {dataFrame.columns[i]}. Value: {row[i]}. Actual Len: {len(str(row[i]))}')
         # print(query)
         # print(list_values)
+        # dataFrame.to_csv('conv.csv')
         cursor.execute(query, list_values)
 
         list_values = []

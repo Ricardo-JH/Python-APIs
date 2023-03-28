@@ -152,6 +152,9 @@ kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
                                 'note': [   'type', 'id', 'attributes.body', 'attributes.createdAt', 'attributes.modifiedAt', 'attributes.updatedAt', 'relationships.conversation.data.id',
                                             'relationships.conversation.data.type', 'relationships.createdBy.data.id', 'relationships.createdBy.data.type', 'relationships.customer.data.id',
                                             'relationships.customer.data.type', 'relationships.modifiedBy.data.id', 'relationships.modifiedBy.data.type'
+                                ],
+                                'teams':[       'type',	'id', 'attributes.createdAt', 'attributes.deleted', 'attributes.deletedAt', 'attributes.displayName', 'attributes.icon', 'attributes.modifiedAt',
+                                                'attributes.name', 'attributes.updatedAt' 
                                 ]
                         }
 }

@@ -3,11 +3,8 @@ from API_parameters import kustomer_dic
 from warnings import simplefilter
 import SQLConnection
 import pandas as pd
-import numpy as np
 import requests
-import base64
 import time
-import csv
 
 
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
@@ -191,14 +188,67 @@ class API_Kustomer:
             return 1
 
 
+    def load_teams(self):
+        try:
+            url = f'{self.base_API}/teams'
+            next_url = f'{self.base_API}/teams?pageSize=1000'
+            SQL_Table = f'[{self.SQLschema}].[teams]'
+            last_page = False
+
+            users = {
+                'attributes': ['id'],
+                'attributes.members': ['id']
+            }
+
+            SQLConnection.truncate(SQL_Table, self.API_domain)
+            SQLConnection.truncate(SQL_Table.replace('teams', 'team_members'), self.API_domain)
+
+            start_time = time.time()
+
+            while not last_page:
+
+                headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.API_key}"
+                }
+                
+                print(next_url)
+                response = requests.get(next_url, headers=headers).json()
+                df_team_members, df_teams = self.depack_json(response['data'], columns_to_depack=users, lis_df=[])
+
+                try:
+                    next_url = response['links']['next']
+                except KeyError as KeyErr:
+                    next_url = None
+                    time.sleep(0.5)
+
+                elapsedTime = time.time() - start_time
+                print(f'Time to get Teams Data: {elapsedTime} Sec')
+
+                SQLConnection.insert(df_team_members, SQL_Table.replace('teams', 'team_members'), self.API_domain)
+                SQLConnection.insert(df_teams[0], SQL_Table, self.API_domain, columns=kustomer_dic['dict_columns']['teams'])
+                
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/v1/teams?pageSize=1000', next_url)
+                
+            print('\nFinish Updating Teams Data')
+            print(f'Elapsed Time: {time.time() - start_time} Sec')
+            return 0
+        except:
+            return 1
+
+
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        # try:
+        try:
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
 
             conversation_attributes = {
                 'attributes': ['id'],
+                'attributes.assistant.assistantId': '',
                 'attributes.channels': '',
                 'attributes.firstDone.assignedUsers': '',
                 'relationships.conversation': '',
@@ -227,10 +277,18 @@ class API_Kustomer:
             start_time = time.time()
 
             while not last_page:
-                response = requests.post(next_url, headers=headers, json=payload).json()
-                print(next_url[-2:].replace('=', ''), sep='  ', end=' ', flush=True)
+                cur_page = next_url[-2:].replace('=', '')
+                print(cur_page, sep='  ', end=' ', flush=True)
                 
-                df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                response = requests.post(next_url, headers=headers, json=payload).json()
+                
+                try:
+                    df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns'][report_type])
+                except KeyError as KeyErr:
+                    print(f'Error on page {cur_page}. {KeyErr}')
+                except ValueError as ValErr:
+                    print(f'Error on data page {cur_page}. {ValErr}')
 
                 try:
                     next_url = response['links']['next']
@@ -238,8 +296,6 @@ class API_Kustomer:
                     next_url = None
                     time.sleep(0.5)
                 
-                SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns'][report_type])
-
                 if next_url == None:
                     last_page = True
                 else:
@@ -249,9 +305,9 @@ class API_Kustomer:
             print(f'\nTime to get Data: {elapsedTime} Sec')
             
             print(f'\nFinish Updating {report_type}')
-        #     return 0
-        # except:
-        #     return 1
+            return 0
+        except:
+            return 1
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
