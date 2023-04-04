@@ -141,8 +141,12 @@ kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
                                                     'relationships.queue.data.id', 'relationships.queue.data.type', 'relationships.sla.data.id', 'relationships.sla.data.type',
                                                     'relationships.slaVersion.data.id', 'relationships.slaVersion.data.type'
                                 ],
+                                'conversation_time': [  'type', 'id', 'attributes.assignedTeams', 'attributes.assignedUsers', 'attributes.createdAt', 'attributes.handleAt',
+                                                        'attributes.handlePauseAt', 'attributes.handlePauseBy', 'attributes.handleTime', 'attributes.messageAt', 'attributes.messageTime', 'attributes.noteAt',
+                                                        'attributes.noteTime'
+                                ],
                                 'message': [    'type',	'id', 'attributes.app',	'attributes.channel', 'attributes.createdAt', 'attributes.direction',
-	                                            'attributes.modifiedAt', 'attributes.preview', 'attributes.responseBusinessTime',
+	                                        'attributes.modifiedAt', 'attributes.preview', 'attributes.responseBusinessTime',
                                                 'attributes.responseTime', 'attributes.rev', 'attributes.sentAt', 'attributes.status',
                                                 'attributes.subject', 'attributes.updatedAt', 'attributes.firstDelivered.clientType',
                                                 'attributes.firstDelivered.timestamp', 'attributes.firstRead.timestamp', 'attributes.meta.answeredAt',
@@ -155,6 +159,9 @@ kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
                                 ],
                                 'teams':[       'type',	'id', 'attributes.createdAt', 'attributes.deleted', 'attributes.deletedAt', 'attributes.displayName', 'attributes.icon', 'attributes.modifiedAt',
                                                 'attributes.name', 'attributes.updatedAt' 
+                                ],
+                                'queues':[      'id', 'type', 'attributes.createdAt', 'attributes.deleted', 'attributes.description', 'attributes.displayName', 'attributes.itemSize', 'attributes.modifiedAt',
+                                                'attributes.name', 'attributes.priority', 'attributes.restrictTransfersByUsers', 'attributes.system', 'attributes.updatedAt'
                                 ]
                         }
 }
