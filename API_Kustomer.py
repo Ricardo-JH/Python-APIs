@@ -241,7 +241,7 @@ class API_Kustomer:
 
 
     def load_conversations(self, report_type, SQL_table, from_date, to_date):
-        try:
+        # try:
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -249,10 +249,15 @@ class API_Kustomer:
             conversation_attributes = {
                 'attributes': ['id'],
                 'attributes.assistant.assistantId': '',
-                'attributes.channels': '',
+                'attributes.channels': ['id'],
                 'attributes.firstDone.assignedUsers': '',
                 'relationships.conversation': '',
                 'relationships.conversation.data': ''
+            }
+
+            conversation_channels = {
+                'attributes': ['id'],
+                'attributes.channels': ['id']
             }
 
             headers = {
@@ -262,11 +267,12 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
-                    { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
+                    { f"{report_type}_created_at": { "gte": f"{from_date}" } },
+                    { f"{report_type}_created_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{f"{report_type}_updated_at": "desc"}],
+                "sort" : [{f"{report_type}_created_at": "desc"}],
                 "queryContext": f"{report_type}",
+                "timeZone": "America/Tijuana",
                 "or":[]
             }
 
@@ -283,7 +289,15 @@ class API_Kustomer:
                 response = requests.post(next_url, headers=headers, json=payload).json()
                 
                 try:
-                    df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    df_channels, df_response = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    
+                    if df_response:
+                        df_response, _ = self.depack_json(df_response[0], columns_to_depack=conversation_attributes, lis_df=[])
+                    else:
+                        df_response = df_channels.loc[:, df_channels.columns!='attributes.channels']
+                        df_channels = df_channels[['id', 'attributes.channels']]
+
+                    SQLConnection.insert(df_channels, SQL_table.replace('conversation', 'conversation_channels'), self.API_domain)
                     SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns'][report_type])
                 except KeyError as KeyErr:
                     print(f'Error on page {cur_page}. {KeyErr}')
@@ -305,9 +319,9 @@ class API_Kustomer:
             print(f'\nTime to get Data: {elapsedTime} Sec')
             
             print(f'\nFinish Updating {report_type}')
-            return 0
-        except:
-            return 1
+        #     return 0
+        # except:
+        #     return 1
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
