@@ -139,7 +139,6 @@ class API_Kustomer:
     
 
     def load_users(self):
-        try:
             url = f'{self.base_API}/users'
             next_url = f'{self.base_API}/users?pageSize=1000'
             SQL_Table = f'[{self.SQLschema}].[users]'
@@ -183,13 +182,9 @@ class API_Kustomer:
                     next_url = url.replace('/v1/users', next_url)
                 
             print('\nFinish Updating Users Data')
-            return 0
-        except:
-            return 1
 
 
     def load_teams(self):
-        try:
             url = f'{self.base_API}/teams'
             next_url = f'{self.base_API}/teams?pageSize=1000'
             SQL_Table = f'[{self.SQLschema}].[teams]'
@@ -235,13 +230,9 @@ class API_Kustomer:
                 
             print('\nFinish Updating Teams Data')
             print(f'Elapsed Time: {time.time() - start_time} Sec')
-            return 0
-        except:
-            return 1
 
 
     def load_queues(self):
-        try:
             url = f'{self.base_API}/routing/queues'
             next_url = f'{self.base_API}/routing/queues?pageSize=1000'
             SQL_Table = f'[{self.SQLschema}].[queues]'
@@ -283,13 +274,9 @@ class API_Kustomer:
                 
             print('\nFinish Updating Queues Data')
             print(f'Elapsed Time: {time.time() - start_time} Sec')
-            return 0
-        except:
-            return 1
 
    
     def load_sms_note(self, report_type, SQL_table, from_date, to_date):
-        try:
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -354,13 +341,9 @@ class API_Kustomer:
             print(f'\nTime to get Data: {elapsedTime} Sec')
             
             print(f'\nFinish Updating {report_type}')
-            return 0
-        except:
-            return 1
 
 
     def load_conversation(self, SQL_table, from_date, to_date):
-        try:
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -434,13 +417,9 @@ class API_Kustomer:
             print(f'\nTime to get Data: {elapsedTime} Sec')
             
             print(f'\nFinish Updating conversation')
-            return 0
-        except:
-            return 1
 
 
     def load_conversation_time(self, SQL_table, from_date, to_date):
-        try:
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -510,13 +489,146 @@ class API_Kustomer:
             print(f'\nTime to get Data: {elapsedTime} Sec')
             
             print(f'\nFinish Updating conversation_time')
-            return 0
-        except:
-            return 1
+
+
+    def load_work_item(self, SQL_table, from_date, to_date):
+            url = f'{self.search_API}'
+            next_url = f'{self.search_API}?pageSize=500&page=1'
+            last_page = False
+
+            conversation_attributes = {
+                'attributes': ['id'],
+                'attributes.ivr': '',
+                'attributes.handle': '',
+                'attributes.wrapUp': '',
+                'attributes.abandoned': '',
+                'attributes.lastRevision': '',
+                'attributes.resource': '',
+                'attributes.resource.sla': ''
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.API_key}"
+            }
+            
+            payload = {
+                "and": [
+                    { "work_item_created_at": { "gte": f"{from_date}" } },
+                    { "work_item_created_at": { "lte": f"{to_date}" } }
+                ],
+                "sort" : [{"work_item_created_at": "desc"}],
+                "queryContext": "work_item",
+                "timeZone": "America/Tijuana",
+                "or":[]
+            }
+
+            if 'Temp' in SQL_table: 
+                SQLConnection.truncate(SQL_table, self.API_domain)
+
+            print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
+            start_time = time.time()
+
+            while not last_page:
+                cur_page = next_url[-2:].replace('=', '')
+                print(cur_page, sep='  ', end=' ', flush=True)
+                
+                response = requests.post(next_url, headers=headers, json=payload).json()
+                
+                try:
+                    df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns']['work_item'])
+                except KeyError as KeyErr:
+                    print(f'Error on page {cur_page}. {KeyErr}')
+                except ValueError as ValErr:
+                    print(f'Error on data page {cur_page}. {ValErr}')
+                try:
+                    next_url = response['links']['next']
+                except KeyError as KeyErr:
+                    next_url = None
+                    time.sleep(0.5)
+                
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/v1/customers/search', next_url)
+            
+            elapsedTime = time.time() - start_time
+            print(f'\nTime to get Data: {elapsedTime} Sec')
+            
+            print(f'\nFinish Updating work_item')
+
+
+    def load_work_session(self, SQL_table, from_date, to_date):
+            url = f'{self.search_API}'
+            next_url = f'{self.search_API}?pageSize=500&page=1'
+            last_page = False
+
+            conversation_attributes = {
+                'attributes': ['id'],
+                'attributes.totalUnavailable': '',
+                'attributes.totalUnavailableIdleCapacity': '',
+                'attributes.abandoned': '',
+                'attributes.lastRevision': '',
+                'attributes.resource': '',
+                'attributes.resource.sla': '',
+                'relationships.queues': '',
+                'relationships.queues.data': ''
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.API_key}"
+            }
+            
+            payload = {
+                "and": [
+                    { "work_session_created_at": { "gte": f"{from_date}" } },
+                    { "work_session_created_at": { "lte": f"{to_date}" } }
+                ],
+                "sort" : [{"work_session_created_at": "desc"}],
+                "queryContext": "work_session",
+                "timeZone": "America/Tijuana",
+                "or":[]
+            }
+
+            if 'Temp' in SQL_table: 
+                SQLConnection.truncate(SQL_table, self.API_domain)
+
+            print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
+            start_time = time.time()
+
+            while not last_page:
+                cur_page = next_url[-2:].replace('=', '')
+                print(cur_page, sep='  ', end=' ', flush=True)
+                
+                response = requests.post(next_url, headers=headers, json=payload).json()
+                
+                try:
+                    df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns']['work_session'])
+                except KeyError as KeyErr:
+                    print(f'Error on page {cur_page}. {KeyErr}')
+                except ValueError as ValErr:
+                    print(f'Error on data page {cur_page}. {ValErr}')
+                try:
+                    next_url = response['links']['next']
+                except KeyError as KeyErr:
+                    next_url = None
+                    time.sleep(0.5)
+                
+                if next_url == None:
+                    last_page = True
+                else:
+                    next_url = url.replace('/v1/customers/search', next_url)
+            
+            elapsedTime = time.time() - start_time
+            print(f'\nTime to get Data: {elapsedTime} Sec')
+            
+            print(f'\nFinish Updating work_session')
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
-        # try:
             SQL_tables = []
 
             if start_time == None:
@@ -563,12 +675,13 @@ class API_Kustomer:
                         self.load_conversation(SQL_tables[i], from_date=from_date, to_date=to_date)
                     elif report_types[i] == 'conversation_time':
                         self.load_conversation_time(SQL_tables[i], from_date=from_date, to_date=to_date)
+                    elif report_types[i] == 'work_item':
+                        self.load_work_item(SQL_tables[i], from_date=from_date, to_date=to_date)
+                    elif report_types[i] == 'work_session':
+                        self.load_work_session(SQL_tables[i], from_date=from_date, to_date=to_date)
 
                     aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
                     aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
                     
             print('Finish loading Data\n')
-        #     return 0
-        # except:
-        #     return 1
 
