@@ -1,6 +1,10 @@
+from warnings import simplefilter
 import pandas as pd
 import pyodbc
 import time
+
+
+simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 
 def select(API_domain, query): 
@@ -24,8 +28,8 @@ def select(API_domain, query):
     # data = data[['Emp', 'schedule_referenceDate_TRESS', 'schedule_daily_Genesys']]
     
     elapsedTime = time.time() - start_time
-    print(f'Time get data: {elapsedTime} sec')
-    print(data)
+    # print(f'Time get data: {elapsedTime} sec')
+    # print(data)
 
     connection.close()
     return data
@@ -76,6 +80,7 @@ def insert(dataFrame, SQL_Table, API_domain, columns=None):
     query = f'INSERT INTO {SQL_Table} ({insert_into}) Values({var_values})'
     
     # createTable(SQL_Table, dataFrame)
+    # dataFrame.to_csv('conv.csv')
 
     for index, row in dataFrame.iterrows():
         for i in range(len_DataFrame_columns):
@@ -84,7 +89,7 @@ def insert(dataFrame, SQL_Table, API_domain, columns=None):
                 # print(f'Item: {dataFrame.columns[i]}. Value: {row[i]}. Actual Len: {len(str(row[i]))}')
         # print(query)
         # print(list_values)
-        # dataFrame.to_csv('conv.csv')
+        
         cursor.execute(query, list_values)
 
         list_values = []

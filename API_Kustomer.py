@@ -297,17 +297,14 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { f"{report_type}_created_at": { "gte": f"{from_date}" } },
-                    { f"{report_type}_created_at": { "lte": f"{to_date}" } }
+                    { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
+                    { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{f"{report_type}_created_at": "desc"}],
+                # "sort" : [{f"{report_type}_created_at": "desc"}],
                 "queryContext": f"{report_type}",
                 "timeZone": "America/Tijuana",
                 "or":[]
             }
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -364,18 +361,14 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "conversation_created_at": { "gte": f"{from_date}" } },
-                    { "conversation_created_at": { "lte": f"{to_date}" } }
+                    { "conversation_updated_at": { "gte": f"{from_date}" } }, # created / updated
+                    { "conversation_updated_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{"{conversation_created_at": "desc"}],
+                # "sort" : [{"{conversation_created_at": "desc"}],
                 "queryContext": "conversation",
                 "timeZone": "America/Tijuana",
                 "or":[]
             }
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
-                SQLConnection.truncate(SQL_table.replace('conversation', 'conversation_channels'), self.API_domain)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -437,17 +430,14 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "conversation_created_at": { "gte": f"{from_date}" } },
-                    { "conversation_created_at": { "lte": f"{to_date}" } }
+                    { "conversation_time_handle_at": { "gte": f"{from_date}" } },
+                    { "conversation_time_handle_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{"conversation_created_at": "desc"}],
+                # "sort" : [{"conversation_created_at": "desc"}],
                 "queryContext": "conversation_time",
                 "timeZone": "America/Tijuana",
                 "or":[]
             }
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -466,14 +456,14 @@ class API_Kustomer:
                     else:
                         df_response = df_channels.loc[:, df_channels.columns!='attributes.channels']
                         df_channels = df_channels[['id', 'attributes.channels']]
-
+                    
                     SQLConnection.insert(df_channels, SQL_table.replace('conversation_time', 'conversation_time_channels'), self.API_domain)
                     SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns']['conversation_time'])
                 except KeyError as KeyErr:
                     print(f'Error on page {cur_page}. {KeyErr}')
                 except ValueError as ValErr:
                     print(f'Error on data page {cur_page}. {ValErr}')
-
+                
                 try:
                     next_url = response['links']['next']
                 except KeyError as KeyErr:
@@ -514,17 +504,14 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "work_item_created_at": { "gte": f"{from_date}" } },
-                    { "work_item_created_at": { "lte": f"{to_date}" } }
+                    { "work_item_handle_completed_at": { "gte": f"{from_date}" } },
+                    { "work_item_handle_completed_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{"work_item_created_at": "desc"}],
+                # "sort" : [{"work_item_handle_completed_at": "desc"}],
                 "queryContext": "work_item",
                 "timeZone": "America/Tijuana",
                 "or":[]
             }
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -537,6 +524,7 @@ class API_Kustomer:
                 
                 try:
                     df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
+                    df_response.to_csv('data.csv')
                     SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns']['work_item'])
                 except KeyError as KeyErr:
                     print(f'Error on page {cur_page}. {KeyErr}')
@@ -583,17 +571,14 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "work_session_created_at": { "gte": f"{from_date}" } },
-                    { "work_session_created_at": { "lte": f"{to_date}" } }
+                    { "work_session_updated_at": { "gte": f"{from_date}" } },
+                    { "work_session_updated_at": { "lte": f"{to_date}" } }
                 ],
-                "sort" : [{"work_session_created_at": "desc"}],
+                # "sort" : [{"work_session_created_at": "desc"}],
                 "queryContext": "work_session",
                 "timeZone": "America/Tijuana",
                 "or":[]
             }
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -628,12 +613,13 @@ class API_Kustomer:
             print(f'\nFinish Updating work_session')
 
 
-    def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
+    def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=24*60, interval_minutes=24*60):
             SQL_tables = []
 
             if start_time == None:
                 end_time = datetime.utcnow() + timedelta(minutes=-1)
-                start_time = end_time + timedelta(minutes=-offset_minutes)
+                if type(offset_minutes) == int:
+                    start_time = end_time + timedelta(minutes=-offset_minutes)
             elif type(start_time) == str:
                 start_time = datetime.fromisoformat(start_time)
                 end_time = datetime.fromisoformat(end_time)
@@ -651,24 +637,36 @@ class API_Kustomer:
 
             for i in range(len(SQL_tables)):
                 now = datetime.utcnow()
-                
-                if temp:
-                    
-                    hours = -8
-                else:
-                    hours = 0
-                
+
+                if offset_minutes == 'max':
+                    reference_column = kustomer_dic['reference_maxDate'][i]
+                    table =SQL_tables[i].replace('Temp', '')
+                    query = f'select Top 1 max([attributes.{reference_column}]) max_updatedAt from {table}'
+                    start_time = SQLConnection.select(self.API_domain, query).iloc[0][0]
+
                 aux_start_time = start_time
                 aux_end_time = start_time + timedelta(minutes=interval_minutes)
 
+                if aux_end_time > end_time:
+                    aux_end_time = end_time
+
+                if 'Temp' in SQL_tables[i]: 
+                    SQLConnection.truncate(SQL_tables[i], self.API_domain)
+
+                    if report_types[i] == 'conversation':
+                        SQLConnection.truncate(SQL_tables[i].replace('conversation', 'conversation_channels'), self.API_domain)
+                    if report_types	[i] == 'conversation_time':
+                        SQLConnection.truncate(SQL_tables[i].replace('conversation_time', 'conversation_time_channels'), self.API_domain)
+
                 while aux_end_time <= end_time and aux_end_time <= now:
+                    
                     print(f'\n{SQL_tables[i]} {self.API_domain}')
-                    print(f'Load until: {end_time + timedelta(hours=hours)}')
-                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_end_time + timedelta(hours=hours)}')
+                    print(f'Load until: {end_time}')
+                    print(f'Loading {aux_start_time} -> {aux_end_time}')
 
                     from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
                     to_date = aux_end_time.strftime('%Y-%m-%dT%H:%M:%S')
-
+                    
                     if report_types[i] in ['note', 'message']:
                         self.load_sms_note(report_types[i], SQL_tables[i], from_date=from_date, to_date=to_date)
                     elif report_types[i] == 'conversation':
@@ -679,9 +677,12 @@ class API_Kustomer:
                         self.load_work_item(SQL_tables[i], from_date=from_date, to_date=to_date)
                     elif report_types[i] == 'work_session':
                         self.load_work_session(SQL_tables[i], from_date=from_date, to_date=to_date)
-
+                    
                     aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
                     aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
+
+                    if (aux_end_time > end_time) and (aux_start_time < end_time):
+                        aux_end_time = end_time
                     
             print('Finish loading Data\n')
 

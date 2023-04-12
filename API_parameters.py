@@ -73,7 +73,8 @@ kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
                     'searchAPI':  'https://api.kustomerapp.com/v1/customers/search',
                     'API_key':  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY0MTljNmEyM2Y3NDljN2Y2ZjBhNDNjMiIsInVzZXIiOiI2NDE5YzZhMTJmMDQ4MDU1Y2ExZjYwNmEiLCJvcmciOiI1ZmVkZWU4MjdkYWYyY2ZlMWE4M2U5Y2UiLCJvcmdOYW1lIjoiam9pbnJvb3QiLCJ1c2VyVHlwZSI6Im1hY2hpbmUiLCJwb2QiOiJwcm9kMSIsInJvbGVzIjpbIm9yZy5hZG1pbiIsIm9yZy5hZG1pbi51c2VyIiwib3JnLmFkbWluLnVzZXIucmVhZCIsIm9yZy5wZXJtaXNzaW9uLmFuYWx5dGljcyIsIm9yZy5wZXJtaXNzaW9uLmFuYWx5dGljcy5yZWFkIiwib3JnLnBlcm1pc3Npb24uYXR0YWNobWVudC5yZWFkIiwib3JnLnBlcm1pc3Npb24uY29udmVyc2F0aW9uLnJlYWQiLCJvcmcucGVybWlzc2lvbi5tZXNzYWdlLnJlYWQiLCJvcmcucGVybWlzc2lvbi5tZXRhZGF0YS5yZWFkIiwib3JnLnBlcm1pc3Npb24ubWV0YWRhdGFfc2Vuc2l0aXZlLnJlYWQiLCJvcmcucGVybWlzc2lvbi5ub3RlLnJlYWQiLCJvcmcucGVybWlzc2lvbi5xdWV1ZS5yZWFkIiwib3JnLnBlcm1pc3Npb24ucmVhZCIsIm9yZy5wZXJtaXNzaW9uLnJvdXRpbmcucmVhZCIsIm9yZy5wZXJtaXNzaW9uLnJvdXRpbmdfc3RhdHVzLnJlYWQiLCJvcmcucGVybWlzc2lvbi5zYXRpc2ZhY3Rpb24ucmVhZCIsIm9yZy5wZXJtaXNzaW9uLnNjaGVkdWxlLnJlYWQiLCJvcmcucGVybWlzc2lvbi5zZWFyY2guY3JlYXRlIiwib3JnLnBlcm1pc3Npb24uc2VhcmNoLnJlYWQiLCJvcmcucGVybWlzc2lvbi5zbGEucmVhZCIsIm9yZy5wZXJtaXNzaW9uLnVzZXIiLCJvcmcucGVybWlzc2lvbi51c2VyLnJlYWQiLCJvcmcucGVybWlzc2lvbi51c2VyX2FjdGl2aXR5LnJlYWQiLCJvcmcucGVybWlzc2lvbi51c2VyX3BlcmZvcm1hbmNlLnJlYWQiLCJvcmcucGVybWlzc2lvbi53b3JrX2l0ZW0ucmVhZCIsIm9yZy5wZXJtaXNzaW9uLndvcmtfc2Vzc2lvbi5yZWFkIiwib3JnLnBlcm1pc3Npb24ud29ya2Zsb3cucmVhZCJdLCJhdWQiOiJ1cm46Y29uc3VtZXIiLCJpc3MiOiJ1cm46YXBpIiwic3ViIjoiNjQxOWM2YTEyZjA0ODA1NWNhMWY2MDZhIn0.NMJK2mYcwXnjXGv9HqkP26I1wqi_Hg3oYL2iMQIfQ6s',
                     'SQLschema': 'Kustomer',
-                    'report_types': ['conversation', 'message', 'note', 'conversation_time', 'work_item', 'work_session'], # 'work-sessions', 'work-items', 'users', 'sla', 'satisfaction']
+                    'report_types':['conversation', 'message', 'note', 'conversation_time', 'work_item', 'work_session'], # 'work-sessions', 'work-items', 'users', 'sla', 'satisfaction']
+                    'reference_maxDate': ['updatedAt', 'updatedAt', 'updatedAt', 'handleAt', 'updatedAt', 'updatedAt'],
                     'dict_columns': {
                                 'users':[   'type', 'id', 'attributes.createdAt', 'attributes.deletedAt', 'attributes.displayName',
                                             'attributes.email', 'attributes.emailVerifiedAt', 'attributes.firstEmailVerifiedAt',
@@ -143,7 +144,7 @@ kustomer_dic = {    'baseAPI':  'https://api.kustomerapp.com/v1',
                                 ],
                                 'conversation_time': [  'type', 'id', 'attributes.assignedTeams', 'attributes.assignedUsers', 'attributes.createdAt', 'attributes.handleAt',
                                                         'attributes.handlePauseAt', 'attributes.handlePauseBy', 'attributes.handleTime', 'attributes.messageAt', 'attributes.messageTime', 'attributes.noteAt',
-                                                        'attributes.noteTime'
+                                                        'attributes.noteTime', 'relationships.conversation.data.id', 'relationships.createdBy.data.id', 'relationships.customer.data.id'
                                 ],
                                 'work_item': [  'id', 'type', 'attributes.channel', 'attributes.completedAt', 'attributes.createdAt', 'attributes.firstEnterQueueAt', 'attributes.itemSize', 'attributes.modifiedAt',
                                                 'attributes.paused', 'attributes.priority', 'attributes.queuedCount', 'attributes.resourceCreatedAt', 'attributes.resourceDirection',
