@@ -276,7 +276,7 @@ class API_Kustomer:
             print(f'Elapsed Time: {time.time() - start_time} Sec')
 
    
-    def load_sms_note(self, report_type, SQL_table, from_date, to_date):
+    def load_sms_note(self, report_type, SQL_table, from_date, to_date, offset_minutes):
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -300,11 +300,13 @@ class API_Kustomer:
                     { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
                     { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
                 ],
-                # "sort" : [{f"{report_type}_created_at": "desc"}],
                 "queryContext": f"{report_type}",
-                "timeZone": "America/Tijuana",
+                # "timeZone": "America/Tijuana",
                 "or":[]
             }
+
+            if offset_minutes == 'max':
+                payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -340,7 +342,7 @@ class API_Kustomer:
             print(f'\nFinish Updating {report_type}')
 
 
-    def load_conversation(self, SQL_table, from_date, to_date):
+    def load_conversation(self, SQL_table, from_date, to_date, offset_minutes):
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -364,11 +366,13 @@ class API_Kustomer:
                     { "conversation_updated_at": { "gte": f"{from_date}" } }, # created / updated
                     { "conversation_updated_at": { "lte": f"{to_date}" } }
                 ],
-                # "sort" : [{"{conversation_created_at": "desc"}],
                 "queryContext": "conversation",
-                "timeZone": "America/Tijuana",
+                # "timeZone": "America/Tijuana",
                 "or":[]
             }
+
+            if offset_minutes == 'max':
+                payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -412,7 +416,7 @@ class API_Kustomer:
             print(f'\nFinish Updating conversation')
 
 
-    def load_conversation_time(self, SQL_table, from_date, to_date):
+    def load_conversation_time(self, SQL_table, from_date, to_date, offset_minutes):
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -433,11 +437,13 @@ class API_Kustomer:
                     { "conversation_time_handle_at": { "gte": f"{from_date}" } },
                     { "conversation_time_handle_at": { "lte": f"{to_date}" } }
                 ],
-                # "sort" : [{"conversation_created_at": "desc"}],
                 "queryContext": "conversation_time",
-                "timeZone": "America/Tijuana",
+                # "timeZone": "America/Tijuana",
                 "or":[]
             }
+
+            if offset_minutes == 'max':
+                payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -481,7 +487,7 @@ class API_Kustomer:
             print(f'\nFinish Updating conversation_time')
 
 
-    def load_work_item(self, SQL_table, from_date, to_date):
+    def load_work_item(self, SQL_table, from_date, to_date, offset_minutes):
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -507,11 +513,13 @@ class API_Kustomer:
                     { "work_item_handle_completed_at": { "gte": f"{from_date}" } },
                     { "work_item_handle_completed_at": { "lte": f"{to_date}" } }
                 ],
-                # "sort" : [{"work_item_handle_completed_at": "desc"}],
                 "queryContext": "work_item",
-                "timeZone": "America/Tijuana",
+                # "timeZone": "America/Tijuana",
                 "or":[]
             }
+
+            if offset_minutes == 'max':
+                payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -524,7 +532,7 @@ class API_Kustomer:
                 
                 try:
                     df_response, _ = self.depack_json(response['data'], columns_to_depack=conversation_attributes, lis_df=[])
-                    df_response.to_csv('data.csv')
+                    
                     SQLConnection.insert(df_response, SQL_table, self.API_domain, columns=kustomer_dic['dict_columns']['work_item'])
                 except KeyError as KeyErr:
                     print(f'Error on page {cur_page}. {KeyErr}')
@@ -547,7 +555,7 @@ class API_Kustomer:
             print(f'\nFinish Updating work_item')
 
 
-    def load_work_session(self, SQL_table, from_date, to_date):
+    def load_work_session(self, SQL_table, from_date, to_date, offset_minutes):
             url = f'{self.search_API}'
             next_url = f'{self.search_API}?pageSize=500&page=1'
             last_page = False
@@ -574,11 +582,13 @@ class API_Kustomer:
                     { "work_session_updated_at": { "gte": f"{from_date}" } },
                     { "work_session_updated_at": { "lte": f"{to_date}" } }
                 ],
-                # "sort" : [{"work_session_created_at": "desc"}],
                 "queryContext": "work_session",
-                "timeZone": "America/Tijuana",
+                # "timeZone": "America/Tijuana",
                 "or":[]
             }
+
+            if offset_minutes == 'max':
+                payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -642,7 +652,7 @@ class API_Kustomer:
                     reference_column = kustomer_dic['reference_maxDate'][i]
                     table =SQL_tables[i].replace('Temp', '')
                     query = f'select Top 1 max([attributes.{reference_column}]) max_updatedAt from {table}'
-                    start_time = SQLConnection.select(self.API_domain, query).iloc[0][0]
+                    start_time = SQLConnection.select(self.API_domain, query).iloc[0][0] + timedelta()
 
                 aux_start_time = start_time
                 aux_end_time = start_time + timedelta(minutes=interval_minutes)
@@ -668,15 +678,15 @@ class API_Kustomer:
                     to_date = aux_end_time.strftime('%Y-%m-%dT%H:%M:%S')
                     
                     if report_types[i] in ['note', 'message']:
-                        self.load_sms_note(report_types[i], SQL_tables[i], from_date=from_date, to_date=to_date)
+                        self.load_sms_note(report_types[i], SQL_tables[i], from_date=from_date, to_date=to_date, offset_minutes=offset_minutes)
                     elif report_types[i] == 'conversation':
-                        self.load_conversation(SQL_tables[i], from_date=from_date, to_date=to_date)
+                        self.load_conversation(SQL_tables[i], from_date=from_date, to_date=to_date, offset_minutes=offset_minutes)
                     elif report_types[i] == 'conversation_time':
-                        self.load_conversation_time(SQL_tables[i], from_date=from_date, to_date=to_date)
+                        self.load_conversation_time(SQL_tables[i], from_date=from_date, to_date=to_date, offset_minutes=offset_minutes)
                     elif report_types[i] == 'work_item':
-                        self.load_work_item(SQL_tables[i], from_date=from_date, to_date=to_date)
+                        self.load_work_item(SQL_tables[i], from_date=from_date, to_date=to_date, offset_minutes=offset_minutes)
                     elif report_types[i] == 'work_session':
-                        self.load_work_session(SQL_tables[i], from_date=from_date, to_date=to_date)
+                        self.load_work_session(SQL_tables[i], from_date=from_date, to_date=to_date, offset_minutes=offset_minutes)
                     
                     aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
                     aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)

@@ -737,24 +737,19 @@ class API_Genesys():
             depacked_df_list.insert(0, df_metrics)
             depacked_df_list.insert(0, df_segments)
 
+            for i in range(len(tables)):
+                # print(SQL_table.replace(report_type, names[i]))
+                SQLConnection.insert(tables[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
+
             for i in range(len(depacked_df_list)):
                 tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
             
             cur_page += 1
             payload['paging']['pageNumber'] = str(cur_page)
             # isValidResponse = True
-        print('\n')
-        for i in range(len(tables)):
-            
-            print(SQL_table.replace(report_type, names[i]))
-            
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table.replace(report_type, names[i]), self.API_domain)
-                
-            SQLConnection.insert(tables[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
     
         elapsedTime = time.time() - start_time
-        print(f'Total Time to load Data Report: {elapsedTime} Sec')
+        print(f'\nTotal Time to load Data Report: {elapsedTime} Sec')
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
@@ -783,13 +778,20 @@ class API_Genesys():
                 now = datetime.utcnow()
                 
                 if temp:
-                    
-                    hours = -8
+                    hours = -7
                 else:
                     hours = 0
                 
                 aux_start_time = start_time
                 aux_end_time = start_time + timedelta(minutes=interval_minutes)
+
+                if 'Temp' in SQL_tables[i]: 
+                    SQLConnection.truncate(SQL_tables[i], self.API_domain)
+                    
+                    if report_types[i] == 'conversations':
+                        SQLConnection.truncate(SQL_tables[i].replace('conversations', 'conversations_segments'), self.API_domain)
+                        SQLConnection.truncate(SQL_tables[i].replace('conversations', 'conversations_metrics'), self.API_domain)
+                        SQLConnection.truncate(SQL_tables[i].replace('conversations', 'conversations_participants'), self.API_domain)
 
                 while aux_end_time <= end_time and aux_end_time <= now:
                     print(f'\n{SQL_tables[i]} {self.API_domain}')
