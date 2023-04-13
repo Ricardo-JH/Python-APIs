@@ -753,7 +753,6 @@ class API_Genesys():
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
-        # try:
             SQL_tables = []
 
             if start_time == None:
@@ -810,7 +809,5 @@ class API_Genesys():
                     aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
                     
             print('Finish loading Data\n')
-        #     return 0
-        # except:
-        #     return 1
+
 
