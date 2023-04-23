@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from API_parameters import ultra_dic
 from warnings import simplefilter
 import SQLConnection
@@ -336,29 +336,34 @@ class API_Genesys():
         print('\nFinish updating Activity Codes')
 
 
-    def load_schedules(self, op=1):
-        try:
+    def load_schedules(self, week=None, week_offset=0):
             # self.API.load_schedules_activityCodes
-            today = datetime.now().date()
-            start_of_week = today - timedelta(days=today.weekday())
+            SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
+            weekdate_end = datetime.date(datetime.now()) - timedelta(days=datetime.now().weekday())
 
-            for i in range(op):
+            if week == None:
+                weekdate = datetime.date(datetime.now()) - timedelta(days=datetime.now().weekday()) - timedelta(days=week_offset*7)
+                SQLConnection.truncate(SQL_Table, self.API_domain)
+            else:
+                weekdate = datetime.strptime('2023-W' + str(week - week_offset) + '-1', '%G-W%V-%u').strftime('%Y-%m-%d')
+                weekdate = datetime.date(datetime.strptime(weekdate, '%Y-%m-%d'))
+                SQL_Table = SQL_Table.replace('Temp', '')
+            
+            week = weekdate.isocalendar()[1]
+            aux_start_of_week = weekdate
+
+            # print(type(weekdate))
+            # print(type(weekdate_end))
+
+            while aux_start_of_week <= weekdate_end:
                 
                 df = pd.DataFrame()
-                SQL_Table = f'[{self.SQLschema}Temp].[schedules]'
                 
-                if op > 1:
-                    SQL_Table = SQL_Table.replace('Temp', '')
-                else:
-                    SQLConnection.truncate(SQL_Table, self.API_domain)
-                
-                aux_start_of_week = start_of_week
+                print(f'Week {week} {aux_start_of_week}')
                 LOB_list, schedule_id = self.get_LOB(aux_start_of_week)
                 
-                j = 1
-                
                 for LOB in LOB_list:
-                    print(j)
+                    # print(j)
                     url = f'{self.base_API}/workforcemanagement/managementunits/{LOB}/weeks/{aux_start_of_week}/schedules/{schedule_id}'
 
                     self.authorize()
@@ -409,16 +414,12 @@ class API_Genesys():
                             elapsedTime = time.time() - start_time
 
                     elapsedTime = time.time() - start_time
-                    print(self.access_token[-10:-1])
                     print(f'Time to get Schedule {LOB}: {elapsedTime} Sec')
-                    j = j + 1
                 SQLConnection.insert(df, SQL_Table, self.API_domain)
                 print('\nFinish Loading Schedules Data')
                 
-                aux_start_of_week = aux_start_of_week - timedelta(days=7)
-            return 0
-        except:
-            return 1
+                aux_start_of_week = aux_start_of_week + timedelta(days=7)
+                week += 1
 
 
     def load_users(self):
