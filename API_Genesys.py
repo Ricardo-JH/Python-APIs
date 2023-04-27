@@ -359,7 +359,7 @@ class API_Genesys():
                 
                 df = pd.DataFrame()
                 
-                print(f'Week {week} {aux_start_of_week}')
+                print(f'{SQL_Table} - Week {week} {aux_start_of_week}')
                 LOB_list, schedule_id = self.get_LOB(aux_start_of_week)
                 
                 for LOB in LOB_list:
@@ -392,6 +392,7 @@ class API_Genesys():
                             
                             for schedule_i in range(len(df_schedules.axes[0])):
                                 df_schedule_info = df_schedules[['userId', 'scheduleId', 'weekDate', 'description', 'published']].iloc[schedule_i: schedule_i + 1].reset_index(drop=True)
+                                df_schedule_info['LOB'] = LOB
                                 shifts = df_schedules['userSchedules'].iloc[schedule_i]['shifts']
 
                                 for shift in shifts:
@@ -421,6 +422,63 @@ class API_Genesys():
                 aux_start_of_week = aux_start_of_week + timedelta(days=7)
                 week += 1
 
+
+    def load_LOB(self):
+        url = f'{self.base_API}/workforcemanagement/managementunits'
+        SQL_Table = f'[{self.SQLschema}].[users_LOB]'
+
+        SQLConnection.truncate(SQL_Table, self.API_domain)
+
+        self.authorize()
+        
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {self.access_token}"
+        }
+
+        response = requests.get(url, headers=headers).json()
+
+        cur_page = response['pageNumber']
+        pages = response['pageCount']
+
+        start_time = time.time()
+        print(SQL_Table)
+
+        while cur_page <= pages:
+
+            self.authorize()
+            headers['Authorization'] = f"Bearer {self.access_token}"
+            response = requests.get(url, headers=headers).json()
+
+            df_LOB = response['entities']
+            df_LOB = pd.DataFrame(df_LOB)[['id', 'name']].fillna('')
+            
+            for i in range(df_LOB.shape[0]):
+                LOB_id = df_LOB['id'].iloc[i]
+                LOB_name = df_LOB['name'].iloc[i]
+
+                self.authorize()
+                headers['Authorization'] = f"Bearer {self.access_token}"
+                response = requests.get(f'{url}/{LOB_id}/users', headers=headers).json()
+
+                df_LOB_users = pd.DataFrame(response['entities'])
+                if not df_LOB_users.empty:
+                    df_LOB_users.rename(columns={'id': 'userId'}, inplace=True)
+                    
+                    df_LOB_users['id'] = LOB_id
+                    df_LOB_users['name'] = LOB_name
+                    df_LOB_users = df_LOB_users[['id', 'name', 'userId']]
+                    
+                    SQLConnection.insert(df_LOB_users, SQL_Table, self.API_domain)
+                else:
+                    print(f'{LOB_name} empty')
+            cur_page += 1
+        
+        elapsedTime = time.time() - start_time
+        print(f'Time to get Users LOB Data: {elapsedTime} Sec')
+            
+        print('\nFinish Updating Users LOB Data')
+        
 
     def load_users(self):
         try:
@@ -681,8 +739,6 @@ class API_Genesys():
         tables = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
         names = ['conversations_segments', 'conversations_metrics', 'conversations_participants', 'conversations']
 
-        # isValidResponse = False
-        
         self.authorize()
         headers = {
             "Content-Type": "application/json",
@@ -690,7 +746,7 @@ class API_Genesys():
         }
 
         payload = {
-            "interval": f"{offset_30days}/{end_time}",
+            "interval": f"{from_date}/{to_date}",
             "segmentFilters": [
                 {
                 "type": "and",
@@ -702,11 +758,12 @@ class API_Genesys():
                     {
                         "dimension": "direction",
                         "value": "inbound"
-                    },
-                    {
-                        "dimension": "segmentEnd",
-                        "value": f"{from_date}/{to_date}"
                     }
+                    # ,
+                    # {
+                    #     "dimension": "segmentEnd",
+                    #     "value": f"{from_date}/{to_date}"
+                    # }
                 ]
                 }
             ],
@@ -719,7 +776,6 @@ class API_Genesys():
         
         start_time = time.time()
         
-        # while not isValidResponse:
         self.authorize()
         
         response = requests.post(url, json=payload, headers=headers).json()
@@ -727,28 +783,34 @@ class API_Genesys():
         
         pages = round(response['totalHits'] / 100)
         cur_page = 1
+
+        payload['paging']['pageNumber'] = str(cur_page)
         print(pages)
+        
         while pages > 0 and cur_page <= pages:
-            self.authorize()
             print(cur_page, sep='  ', end=' ', flush=True)
-            response = requests.post(url, json=payload, headers=headers).json()
-            df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
-            df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
-            
-            depacked_df_list.insert(0, df_metrics)
-            depacked_df_list.insert(0, df_segments)
+            try:
+                self.authorize()
+                headers['Authorization'] = f"Bearer {self.access_token}"
+                
+                response = requests.post(url, json=payload, headers=headers).json()
+                df_metrics, depacked_df_list = self.depack_json(response['conversations'], columns_to_depack=metrics, lis_df=[])
+                df_segments, _ = self.depack_json(response['conversations'], columns_to_depack=segments, lis_df=[])
+                
+                depacked_df_list.insert(0, df_metrics)
+                depacked_df_list.insert(0, df_segments)
 
-            for i in range(len(tables)):
-                # print(SQL_table.replace(report_type, names[i]))
-                SQLConnection.insert(tables[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
+                for i in range(len(tables)):
+                    # print(SQL_table.replace(report_type, names[i]))
+                    # print(depacked_df_list[i])
+                    SQLConnection.insert(depacked_df_list[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
+                
+                cur_page += 1
+                payload['paging']['pageNumber'] = str(cur_page)
+            except Exception as e:
+                print(f'Error on page {cur_page}: {e}\n{response}')
+                break
 
-            for i in range(len(depacked_df_list)):
-                tables[i] = pd.concat([depacked_df_list[i], tables[i].loc[:]]).reset_index(drop=True).fillna('')
-            
-            cur_page += 1
-            payload['paging']['pageNumber'] = str(cur_page)
-            # isValidResponse = True
-    
         elapsedTime = time.time() - start_time
         print(f'\nTotal Time to load Data Report: {elapsedTime} Sec')
 
