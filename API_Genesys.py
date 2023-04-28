@@ -462,16 +462,19 @@ class API_Genesys():
                 response = requests.get(f'{url}/{LOB_id}/users', headers=headers).json()
 
                 df_LOB_users = pd.DataFrame(response['entities'])
+                
                 if not df_LOB_users.empty:
                     df_LOB_users.rename(columns={'id': 'userId'}, inplace=True)
                     
                     df_LOB_users['id'] = LOB_id
                     df_LOB_users['name'] = LOB_name
                     df_LOB_users = df_LOB_users[['id', 'name', 'userId']]
-                    
-                    SQLConnection.insert(df_LOB_users, SQL_Table, self.API_domain)
                 else:
+                    df_LOB_users = pd.DataFrame(columns=['id', 'name', 'userId'])
+                    df_LOB_users.loc[len(df_LOB_users)] = [LOB_id, LOB_name, '']
                     print(f'{LOB_name} empty')
+
+                SQLConnection.insert(df_LOB_users, SQL_Table, self.API_domain)
             cur_page += 1
         
         elapsedTime = time.time() - start_time
@@ -480,66 +483,53 @@ class API_Genesys():
         print('\nFinish Updating Users LOB Data')
         
 
-    def load_users(self):
-        try:
-            url = f'{self.base_API}/users'
-            next_url = f'{self.base_API}/users?pageSize=500'
-            SQL_Table = f'[{self.SQLschema}].[users]'
-            last_page = False
+    def load_users(self, agent_state):
+        SQL_Table = f'[{self.SQLschema}].[users]'
+        SQLConnection.truncate(SQL_Table, self.API_domain)
+        
+        for state in agent_state:
+            url = f'{self.base_API}/users?state={state}&pageSize=500&pageNumber=1'
 
-            SQLConnection.truncate(SQL_Table, self.API_domain)
+            start_time = time.time()
 
-            while not last_page:
-
-                self.authorize()
+            self.authorize()
+            headers = {
+            "accept": "application/json",
+            "Authorization": f"Bearer {self.access_token}"
+            }
             
-                headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {self.access_token}"
-                }
-                
-                start_time = time.time()
-                isValidResponse = False
+            response = requests.get(url, headers=headers).json()
+            
+            pageCount = response['pageCount']
+            pageNumber = response['pageNumber']
+            pageSize = 500
 
-                while not isValidResponse:
-                    try:
-                        self.authorize()
-                        # print(url)
-                        print(next_url)
-                        response = requests.get(next_url, headers=headers).json()
-                        time.sleep(1)
-                        # print(response)
-                        df = response['entities']
-                        df_users = pd.DataFrame(df)[['id', 'name', 'email', 'state', 'username', 'version', 'acdAutoAnswer']].fillna('')#
-                        # df_users['ring_groups'] = df_users['ring_groups'].map(str).str.replace('[', '').str.replace(']', '')
-                        # df_users['extension'] = df_users['extension'].map(str)
-                        # print(df_users)
-                        try:
-                            next_url = response['nextUri']
-                        except KeyError as KeyErr:
-                            next_url = None
-                            time.sleep(0.5)
+            print(f'Total: {pageCount}')
 
-                        SQLConnection.insert(df_users, SQL_Table, self.API_domain)
-                        isValidResponse = True
-                        
-                    except:
-                        time.sleep(0.5)
-                        elapsedTime = time.time() - start_time
+            while pageNumber <= pageCount:
+                try:
+                    self.authorize()
+                    headers['Authorization'] = f"Bearer {self.access_token}"
+                    
+                    print(pageNumber, sep='  ', end=' ', flush=True)
+                    
+                    url = f'{self.base_API}/users?state={state}&pageSize={pageSize}&pageNumber={pageNumber}'
+                    response = requests.get(url, headers=headers).json()
 
-                elapsedTime = time.time() - start_time
-                print(self.access_token[-10:-1])
-                print(f'Time to get Users Data: {elapsedTime} Sec')
-                
-                if next_url == None:
-                    last_page = True
-                else:
-                    next_url = url.replace('/api/v2/users', next_url)
+                    df_users = pd.DataFrame(response['entities'])[['id', 'name', 'email', 'state', 'username', 'version', 'acdAutoAnswer']].fillna('')
+                    
+                    SQLConnection.insert(df_users, SQL_Table, self.API_domain)
+                    
+                    pageNumber += 1
 
-            print('\nFinish Updating Users Data')
-            return 0
-        except:
-            return 1
+                except Exception as e:
+                    print(f'Error on page {pageNumber}. {e}')
+                    break
+            
+            elapsedTime = time.time() - start_time
+            print(f'\nTime to get {state} Users Data: {elapsedTime} Sec')
+            
+        print('\nFinish Updating Users Data')
 
 
     def load_usersPresence_jobID(self, report_type, SQL_table, from_date, to_date):
