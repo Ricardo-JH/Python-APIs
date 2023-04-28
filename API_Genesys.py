@@ -613,7 +613,7 @@ class API_Genesys():
         SQLConnection.insert(df, SQL_table, self.API_domain)
 
     
-    def load_usersPresence(self, report_type, SQL_table, from_date, to_date):
+    def load_usersPresence(self, SQL_table, from_date, to_date, offset_minutes):
         try:
             userDetails = {
                 'primaryPresence': ['userId']
@@ -708,7 +708,7 @@ class API_Genesys():
             if 'Temp' in SQL_table: 
                 SQLConnection.truncate(SQL_table, self.API_domain)
                 
-            SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns'][report_type])
+            SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['users_presence'])
         
             elapsedTime = time.time() - start_time
             print(f'Total Time to load Data Report: {elapsedTime} Sec')
@@ -717,7 +717,8 @@ class API_Genesys():
             return 1
 
 
-    def load_conversations(self, report_type, SQL_table, end_time, from_date, to_date):
+    def load_conversations(self, SQL_table, end_time, from_date, to_date, offset_minutes):
+        url = f'{self.base_API}/analytics/conversations/details/query'
 
         metrics = {
             'participants': ['conversationId'], 
@@ -731,22 +732,20 @@ class API_Genesys():
             'participants.sessions.segments': ['conversationId', 'participants.participantId']
         }
 
-        offset_30days = (end_time + timedelta(days=-28)).strftime('%Y-%m-%dT%H:%M:%S')
-        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S')
-
-        url = f'{self.base_API}/analytics/conversations/details/query'
-        
-        tables = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
-        names = ['conversations_segments', 'conversations_metrics', 'conversations_participants', 'conversations']
-
         self.authorize()
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.access_token}"
         }
 
+        offset_30days = (end_time + timedelta(days=-28)).strftime('%Y-%m-%dT%H:%M:%S')
+        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+        
+        tables = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
+        names = ['conversations_segments', 'conversations_metrics', 'conversations_participants', 'conversations']
+            
         payload = {
-            "interval": f"{from_date}/{to_date}",
+            "interval": f"{offset_30days}/{to_date}",
             "segmentFilters": [
                 {
                 "type": "and",
@@ -758,12 +757,11 @@ class API_Genesys():
                     {
                         "dimension": "direction",
                         "value": "inbound"
+                    },
+                    {
+                        "dimension": "segmentEnd",
+                        "value": f"{from_date}/{to_date}"
                     }
-                    # ,
-                    # {
-                    #     "dimension": "segmentEnd",
-                    #     "value": f"{from_date}/{to_date}"
-                    # }
                 ]
                 }
             ],
@@ -776,8 +774,6 @@ class API_Genesys():
         
         start_time = time.time()
         
-        self.authorize()
-        
         response = requests.post(url, json=payload, headers=headers).json()
         time.sleep(0.1)
         
@@ -785,7 +781,7 @@ class API_Genesys():
         cur_page = 1
 
         payload['paging']['pageNumber'] = str(cur_page)
-        print(pages)
+        print(f'Total: {pages}')
         
         while pages > 0 and cur_page <= pages:
             print(cur_page, sep='  ', end=' ', flush=True)
@@ -803,7 +799,7 @@ class API_Genesys():
                 for i in range(len(tables)):
                     # print(SQL_table.replace(report_type, names[i]))
                     # print(depacked_df_list[i])
-                    SQLConnection.insert(depacked_df_list[i], SQL_table.replace(report_type, names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
+                    SQLConnection.insert(depacked_df_list[i], SQL_table.replace('conversations', names[i]), self.API_domain, columns=ultra_dic['dict_columns'][names[i]])
                 
                 cur_page += 1
                 payload['paging']['pageNumber'] = str(cur_page)
@@ -820,7 +816,8 @@ class API_Genesys():
 
             if start_time == None:
                 end_time = datetime.utcnow() + timedelta(minutes=-1)
-                start_time = end_time + timedelta(minutes=-offset_minutes)
+                if type(offset_minutes) == int:
+                    start_time = end_time + timedelta(minutes=-offset_minutes)
             elif type(start_time) == str:
                 start_time = datetime.fromisoformat(start_time)
                 end_time = datetime.fromisoformat(end_time)
@@ -839,13 +836,18 @@ class API_Genesys():
             for i in range(len(SQL_tables)):
                 now = datetime.utcnow()
                 
-                if temp:
-                    hours = -7
-                else:
-                    hours = 0
+                if offset_minutes == 'max':
+                    if report_types[i] == 'conversations':
+                        query = 'select max(segmentEnd) from V_Genesys_conversations'
+                    elif report_types[i] == 'usersPresence':
+                        query = 'select max(endTime) from V_Genesys_presence'
+                    start_time = SQLConnection.select(self.API_domain, query).iloc[0][0] + timedelta(hours=+7)
                 
                 aux_start_time = start_time
                 aux_end_time = start_time + timedelta(minutes=interval_minutes)
+
+                if aux_end_time > end_time:
+                    aux_end_time = end_time
 
                 if 'Temp' in SQL_tables[i]: 
                     SQLConnection.truncate(SQL_tables[i], self.API_domain)
@@ -857,19 +859,22 @@ class API_Genesys():
 
                 while aux_end_time <= end_time and aux_end_time <= now:
                     print(f'\n{SQL_tables[i]} {self.API_domain}')
-                    print(f'Load until: {end_time + timedelta(hours=hours)}')
-                    print(f'Loading {aux_start_time + timedelta(hours=hours)} -> {aux_end_time + timedelta(hours=hours)}')
+                    print(f'Load until: {end_time}')
+                    print(f'Loading {aux_start_time} -> {aux_end_time}')
 
                     from_date = aux_start_time.strftime('%Y-%m-%dT%H:%M:%S')
                     to_date = aux_end_time.strftime('%Y-%m-%dT%H:%M:%S')
 
                     if report_types[i] == 'users_presence':
-                        self.load_usersPresence(report_types[i], SQL_tables[i], from_date, to_date)
+                        self.load_usersPresence(SQL_tables[i], from_date, to_date, offset_minutes)
                     if report_types[i] == 'conversations':
-                        self.load_conversations(report_types[i], SQL_tables[i], end_time, from_date, to_date)
+                        self.load_conversations(SQL_tables[i], end_time, from_date, to_date, offset_minutes)
 
                     aux_start_time = aux_start_time + timedelta(minutes=interval_minutes)
                     aux_end_time = aux_start_time + timedelta(minutes=interval_minutes)
+
+                    if (aux_end_time > end_time) and (aux_start_time < end_time):
+                        aux_end_time = end_time
                     
             print('Finish loading Data\n')
 
