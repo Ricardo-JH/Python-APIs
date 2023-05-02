@@ -604,107 +604,100 @@ class API_Genesys():
 
     
     def load_usersPresence(self, SQL_table, from_date, to_date, offset_minutes):
-        try:
-            userDetails = {
-                'primaryPresence': ['userId']
-            }
-            
-            url = f'{self.base_API}/analytics/users/details/query'
-            
-            df = pd.DataFrame()
-            names = ['usersPresence']
-
-            # isValidResponse = False
-            
-            self.authorize()
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.access_token}"
-            }
-
-            payload = {
-                "interval": f"{from_date}/{to_date}",
-                "presenceFilters": [
-                    {
-                        "type": "or",
-                        "predicates": [
-                            {
-                                "dimension": "systemPresence",
-                                "value": "AVAILABLE"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "AWAY"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "BREAK"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "BUSY"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "MEAL"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "ON_QUEUE"
-                            },
-                            {
-                                "dimension": "systemPresence",
-                                "value": "TRAINNING"
-                            }
-                        ]
-                    }
-                ],
-                "paging": {
-                    "pageSize": 100,
-                    "pageNumber": 1
-                },
-                "order": "asc"
-            }
-            
-            start_time = time.time()
-            
-            # while not isValidResponse:
-            self.authorize()
-            
-            response = requests.post(url, json=payload, headers=headers).json()
-            time.sleep(0.1)
-            
-            pages = round(response['totalHits'] / 100)
-            print(pages)
-            cur_page = 1
-            while pages > 0 and cur_page <= pages:
-                self.authorize()
-                print(cur_page, sep='  ', end=' ', flush=True)
-                response = requests.post(url, json=payload, headers=headers).json()
-                df_usersPresence, _ = self.depack_json(response['userDetails'], columns_to_depack=userDetails, lis_df=[])
-                # depacked_df_list.insert(0, df_usersPresence)
-
-                df = pd.concat([df_usersPresence, df.loc[:]]).reset_index(drop=True).fillna('')
-                
-                cur_page += 1
-                payload['paging']['pageNumber'] = str(cur_page)
-
-                # isValidResponse = True
-            print('\n')
-            
-            df['users_presence_id'] = df['userId'] + ' ' + df['primaryPresence.startTime'].astype(str)
-            df['primaryPresence.endTime'] = df['primaryPresence.endTime'].replace([''], [datetime.utcnow() + timedelta(minutes=-1)])
-
-            if 'Temp' in SQL_table: 
-                SQLConnection.truncate(SQL_table, self.API_domain)
-                
-            SQLConnection.insert(df, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['users_presence'])
+        userDetails = {
+            'primaryPresence': ['userId']
+        }
         
-            elapsedTime = time.time() - start_time
-            print(f'Total Time to load Data Report: {elapsedTime} Sec')
-            return 0
-        except:
-            return 1
+        url = f'{self.base_API}/analytics/users/details/query'
+        
+        now = datetime.utcnow()
+        
+        self.authorize()
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.access_token}"
+        }
+
+        payload = {
+            "interval": f"{from_date}/{to_date}",
+            "presenceFilters": [
+                {
+                    "type": "or",
+                    "predicates": [
+                        {
+                            "dimension": "systemPresence",
+                            "value": "AVAILABLE"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "AWAY"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "BREAK"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "BUSY"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "MEAL"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "ON_QUEUE"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "TRAINNING"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "IDLE"
+                        },
+                        {
+                            "dimension": "systemPresence",
+                            "value": "MEETING"
+                        }
+                    ]
+                }
+            ],
+            "paging": {
+                "pageSize": 100,
+                "pageNumber": 1
+            },
+            "order": "asc"
+        }
+        
+        start_time = time.time()
+        
+        response = requests.post(url, json=payload, headers=headers).json()
+        
+        pages = round(response['totalHits'] / 100)
+        print(pages)
+        cur_page = 1
+
+        while pages > 0 and cur_page <= pages:
+            self.authorize()
+            headers['Authorization'] = f"Bearer {self.access_token}"
+
+            print(cur_page, sep='  ', end=' ', flush=True)
+            response = requests.post(url, json=payload, headers=headers).json()
+            df_usersPresence, _ = self.depack_json(response['userDetails'], columns_to_depack=userDetails, lis_df=[])
+
+            df_usersPresence['users_presence_id'] = df_usersPresence['userId'] + ' ' + df_usersPresence['primaryPresence.startTime'].astype(str)
+            df_usersPresence['primaryPresence.endTime'] = df_usersPresence['primaryPresence.endTime'].replace([''], [now + timedelta(minutes=-1)])
+
+            SQLConnection.insert(df_usersPresence, SQL_table, self.API_domain, columns=ultra_dic['dict_columns']['users_presence'])
+
+            cur_page += 1
+            payload['paging']['pageNumber'] = str(cur_page)
+
+        print('\n')
+    
+        elapsedTime = time.time() - start_time
+        print(f'Total Time to load Data Report: {elapsedTime} Sec')
 
 
     def load_conversations(self, SQL_table, end_time, from_date, to_date, offset_minutes):
@@ -829,7 +822,7 @@ class API_Genesys():
                 if offset_minutes == 'max':
                     if report_types[i] == 'conversations':
                         query = 'select max(segmentEnd) from V_Genesys_conversations'
-                    elif report_types[i] == 'usersPresence':
+                    elif report_types[i] == 'users_presence':
                         query = 'select max(endTime) from V_Genesys_presence'
                     start_time = SQLConnection.select(self.API_domain, query).iloc[0][0] + timedelta(hours=+7)
                 
