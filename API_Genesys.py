@@ -483,6 +483,85 @@ class API_Genesys():
         print('\nFinish Updating Users LOB Data')
         
 
+    def load_queues(self):
+        url = f'{self.base_API}/routing/queues'
+        SQL_Table = f'[{self.SQLschema}].[queues]'
+        queues = {'mediaSettings': 'id',
+                  'mediaSettings.call': '',
+                  'mediaSettings.call.serviceLevel': ''}
+
+        SQLConnection.truncate(SQL_Table, self.API_domain)
+        SQLConnection.truncate(SQL_Table.replace('queues', 'users_queues'), self.API_domain)
+
+        self.authorize()
+        
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {self.access_token}"
+        }
+
+        response = requests.get(url, headers=headers).json()
+        
+        cur_page_queue = response['pageNumber']
+        pages_queue = 1
+        pageSize_queue = 500
+        pageSize_queue_users = 100
+
+        start_time = time.time()
+        print(SQL_Table)
+        print(f'Total: {pages_queue}')
+
+        while cur_page_queue <= pages_queue:
+
+            self.authorize()
+            headers['Authorization'] = f"Bearer {self.access_token}"
+            
+            response = requests.get(f'{url}?pageSize={pageSize_queue}&pageNumber={cur_page_queue}', headers=headers).json()
+            df_queues, _ = self.depack_json(response['entities'], columns_to_depack=queues, lis_df=[])
+            print(df_queues)
+            SQLConnection.insert(df_queues, SQL_Table, self.API_domain, columns=ultra_dic['dict_columns']['queues'])
+            
+            elapsedTime = time.time() - start_time
+            print(f'Time to load Queues: {elapsedTime} Sec')
+            
+            for i in range(df_queues.shape[0]):
+                Queue_id = df_queues['id'].iloc[i]
+                Queue_name = df_queues['name'].iloc[i]
+
+                self.authorize()
+                headers['Authorization'] = f"Bearer {self.access_token}"
+                
+                next_url = f'{url}/{Queue_id}/members?pageSize={pageSize_queue_users}&pageNumber=1'
+                
+                while next_url:
+                    response = requests.get(next_url, headers=headers).json()
+                    df_queue_users = pd.DataFrame(response['entities'])
+                    
+                    if not df_queue_users.empty:
+                        df_queue_users.rename(columns={'id': 'userId'}, inplace=True)
+                        
+                        df_queue_users['id'] = Queue_id
+                        df_queue_users['name'] = Queue_name
+                        df_queue_users = df_queue_users[['id', 'name', 'userId']]
+                    else:
+                        df_queue_users = pd.DataFrame(columns=['id', 'name', 'userId'])
+                        df_queue_users.loc[len(df_queue_users)] = [Queue_id, Queue_name, '']
+                        # print(f'{Queue_name} empty')
+                    
+                    SQLConnection.insert(df_queue_users, SQL_Table.replace('queues', 'users_queues'), self.API_domain)
+                    
+                    try:
+                        next_url = url.replace('/api/v2/routing/queues', response['nextUri'])
+                    except:
+                        next_url = False
+                
+                elapsedTime = time.time() - start_time
+                print(f'Time to load users Queue {Queue_name} data: {elapsedTime} Sec')
+            cur_page_queue += 1
+            
+        print('\nFinish Updating Users LOB Data')
+        
+
     def load_users(self, agent_state):
         SQL_Table = f'[{self.SQLschema}].[users]'
         SQLConnection.truncate(SQL_Table, self.API_domain)
