@@ -47,8 +47,8 @@ ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
                                                                 'participants.sessions.flowInType',
                                                                 'participants.sessions.mediaType', 
                                                                 'participants.sessions.remote',
-                                                                'participants.sessions.remoteNameDisplayable'
-                                                                
+                                                                'participants.sessions.remoteNameDisplayable',
+                                                                'participants.sessions.selectedAgentId'
                                 ],
                                 'conversations': [
                                                     'conversationId',                                                 

@@ -866,11 +866,41 @@ class API_Genesys():
                 cur_page += 1
                 payload['paging']['pageNumber'] = str(cur_page)
             except Exception as e:
-                print(f'Error on page {cur_page}: {e}\n{response}')
+                print(f'Error on page {cur_page}: {e}\n{pd.DataFrame(response)}')
                 break
 
         elapsedTime = time.time() - start_time
         print(f'\nTotal Time to load Data Report: {elapsedTime} Sec')
+
+
+    def load_evaluations(self):
+        url_base = f'{self.base_API}/quality/evaluations/query'
+        # SQL_Table = f'[{self.SQLschema}].[users_LOB]'
+
+        # SQLConnection.truncate(SQL_Table, self.API_domain)
+
+        self.authorize()
+        
+        headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {self.access_token}"
+        }
+
+        df_users = SQLConnection.select(self.API_domain, 'select id from Genesys.users')
+
+        for i in range(df_users.shape[0]):
+            userId = df_users['id'].iloc[i]
+            url = f'{url_base}?agentUserId={userId}'
+
+            response = requests.get(url, headers=headers).json()
+            # print(url)
+            # print(response)
+            df_response = pd.DataFrame(response)
+
+            if not df_response.empty:
+                print(df_response)
+            # else:
+                # print(f'{userId} empty')
 
 
     def load_data(self, tables, temp, start_time=None, end_time=None, offset_minutes=1440, interval_minutes=1440):
@@ -900,7 +930,7 @@ class API_Genesys():
                 
                 if offset_minutes == 'max':
                     if report_types[i] == 'conversations':
-                        query = 'select max(segmentEnd) from V_Genesys_conversations'
+                        query = 'select max(conversationStart) from V_Genesys_conversations_metrics'
                     elif report_types[i] == 'users_presence':
                         query = 'select max(endTime) from V_Genesys_presence'
                     start_time = SQLConnection.select(self.API_domain, query).iloc[0][0] + timedelta(hours=+7)
