@@ -64,7 +64,6 @@ class API_Talkdesk:
 
 
     def load_data(self, tables=None, start_time=None, end_time=None, days=1):
-        try:
             SQL_tables = []
 
             if start_time == None:
@@ -119,9 +118,6 @@ class API_Talkdesk:
                     aux_time = aux_start_time + timedelta(days=1)
 
             print('Finish loading Data\n')
-            return 0
-        except:
-            return 1
 
 
     def execute_report(self, report_type, from_date, to_date):
@@ -174,9 +170,17 @@ class API_Talkdesk:
         start_time = time.time()
         
         while not isValidResponse:
+            response = requests.get(url.replace('files', 'jobs'), headers=headers).json()
             try:
+                status = response['job']['status']
+            except:
+                status = 'created'
+
+            # print(status, sep='  ', end=' ', flush=True)
+            
+            if status == 'created':
                 response = requests.get(url, headers=headers).json()
-                time.sleep(0.5)
+                # time.sleep(0.5)
                 df_entries = pd.DataFrame(response['entries'])
                 df_entries = df_entries.loc[:, df_entries.columns != 'calls_historical_base.data_status'] #[['interaction_id', 'call_type', 'start_time', 'end_time','talkdesk_phone_number', 'customer_phone_number', 'talk_time', 'record','hangup', 'in_business_hours?', 'callback_from_queue?', 'waiting_time','agent_speed_to_answer', 'holding_time', 'rating', 'description','agent_name', 'phone_display_name', 'disposition_code', 'transfer?','handling_agent', 'tags', 'ivr_options', 'csat_score','csat_survey_time', 'team', 'rating_reason', 'agent_disconnected']]
                 df = df_entries.fillna('')
@@ -193,11 +197,10 @@ class API_Talkdesk:
                         # print(df)
                         # print(df.columns)
                     except KeyError as e:
-                        pass
+                        print(response)
 
                 isValidResponse = True
-            except:
-                # print(response)
+            else:
                 time.sleep(0.5)
         
         elapsedTime = time.time() - start_time
@@ -205,22 +208,44 @@ class API_Talkdesk:
         return df
 
 
-    def delete_report(self, report_type, job_ID):
+    def delete_report(self, report_type, job_ID=None):
 
-        url = f'{self.base_API}/data/reports/{report_type}/files/{job_ID}'
+        self.authorize()
 
         headers = {
         "accept": "application/json",
         "Authorization": f"Bearer {self.access_token}"
         }
 
-        try:
-            requests.delete(url, headers=headers)
-            print(f'Job ID {job_ID} deleted')
-        except Exception as e:
-            print(f'Job ID {job_ID} could not be deleted')
-            print(f'{e.__class__} occurred{e}')
+        # delete a job if specified
+        if job_ID:
+            url = f'{self.base_API}/data/reports/{report_type}/files/{job_ID}'
+            try:
+                requests.delete(url, headers=headers)
+                print(f'Job ID {job_ID} deleted')
+            except Exception as e:
+                print(f'Job ID {job_ID} could not be deleted')
+                print(f'{e.__class__} occurred{e}')
+        
+        # delete all jobs of a type
+        else:
+            url = f'{self.base_API}/data/reports/{report_type}/jobs'
+            while url:
+                # print(url)
+                response = requests.get(url, headers=headers).json()
+                df_response = pd.DataFrame(response['_embedded']['jobs'])
+                
+                df_response = df_response.query('status != "deleted"')
 
+                for i in range(len(df_response.index)):
+                    job_ID = df_response.iloc[i]['id']
+                    self.delete_report(report_type, job_ID)
+
+                try:
+                    url = response['_links']['next']['href']
+                except:
+                    url = None
+    
 
     def load_users(self):
         try:

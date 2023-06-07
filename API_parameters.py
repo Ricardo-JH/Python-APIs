@@ -11,7 +11,7 @@ root_dic = {    'loginAPI': 'https://API_domain.talkdeskid.com/oauth/token',
                 'clientID': 'be16049f0dfe4928a0ac13917d72c67c',
                 'client_secret': 'FZ6FyzOsKXo7Dk8votP0fuyxiHp5ze68bP99Vb1z6vWKn9IV4wcLlPMUO0MAy_JLPXCEZ49C6r_M5rN-_oGJAw',
                 'SQLschema': 'Talkdesk',
-                'report_types': ['explore_calls', 'ring_attempts', 'contacts', 'user_status', 'adherence', 'feedback_flow']
+                'report_types': ['explore_calls', 'ring_attempts', 'contacts', 'user_status', 'adherence'] #, 'feedback_flow']
 }
 
 ultra_dic = {   'loginAPI': 'https://login.usw2.pure.cloud/oauth/token',
