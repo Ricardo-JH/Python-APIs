@@ -729,7 +729,7 @@ class API_Genesys():
                         },
                         {
                             "dimension": "systemPresence",
-                            "value": "TRAINNING"
+                            "value": "TRAINING"
                         },
                         {
                             "dimension": "systemPresence",
