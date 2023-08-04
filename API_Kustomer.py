@@ -297,7 +297,7 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { f"{report_type}_updated_at": { "gte": f"{from_date}" } },
+                    { f"{report_type}_updated_at": { "gt": f"{from_date}" } },
                     { f"{report_type}_updated_at": { "lte": f"{to_date}" } }
                 ],
                 "queryContext": f"{report_type}",
@@ -305,8 +305,8 @@ class API_Kustomer:
                 "or":[]
             }
 
-            if offset_minutes == 'max':
-                payload['and'].pop(1)
+            # if offset_minutes == 'max':
+            #     payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -363,7 +363,7 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "conversation_updated_at": { "gte": f"{from_date}" } }, # created / updated
+                    { "conversation_updated_at": { "gt": f"{from_date}" } }, # created / updated
                     { "conversation_updated_at": { "lte": f"{to_date}" } }
                 ],
                 "queryContext": "conversation",
@@ -371,8 +371,8 @@ class API_Kustomer:
                 "or":[]
             }
 
-            if offset_minutes == 'max':
-                payload['and'].pop(1)
+            # if offset_minutes == 'max':
+            #     payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -434,7 +434,7 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "conversation_time_handle_at": { "gte": f"{from_date}" } },
+                    { "conversation_time_handle_at": { "gt": f"{from_date}" } },
                     { "conversation_time_handle_at": { "lte": f"{to_date}" } }
                 ],
                 "queryContext": "conversation_time",
@@ -442,8 +442,8 @@ class API_Kustomer:
                 "or":[]
             }
 
-            if offset_minutes == 'max':
-                payload['and'].pop(1)
+            # if offset_minutes == 'max':
+            #     payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -510,7 +510,7 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "work_item_handle_completed_at": { "gte": f"{from_date}" } },
+                    { "work_item_handle_completed_at": { "gt": f"{from_date}" } },
                     { "work_item_handle_completed_at": { "lte": f"{to_date}" } }
                 ],
                 "queryContext": "work_item",
@@ -518,8 +518,8 @@ class API_Kustomer:
                 "or":[]
             }
 
-            if offset_minutes == 'max':
-                payload['and'].pop(1)
+            # if offset_minutes == 'max':
+            #     payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
@@ -579,7 +579,7 @@ class API_Kustomer:
             
             payload = {
                 "and": [
-                    { "work_session_updated_at": { "gte": f"{from_date}" } },
+                    { "work_session_updated_at": { "gt": f"{from_date}" } },
                     { "work_session_updated_at": { "lte": f"{to_date}" } }
                 ],
                 "queryContext": "work_session",
@@ -587,8 +587,8 @@ class API_Kustomer:
                 "or":[]
             }
 
-            if offset_minutes == 'max':
-                payload['and'].pop(1)
+            # if offset_minutes == 'max':
+            #     payload['and'].pop(1)
 
             print('Total:', requests.post(next_url, headers=headers, json=payload).json()['meta']['totalPages'])
             start_time = time.time()
