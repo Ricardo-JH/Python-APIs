@@ -63,16 +63,19 @@ class API_Talkdesk:
                 self.authorize()
 
 
-    def load_data(self, tables=None, start_time=None, end_time=None, days=1):
+    def load_data(self, tables=None, start_time=None, end_time=None, days=1, temp=True):
             SQL_tables = []
 
             if start_time == None:
-                self.SQLschema = self.SQLschema + 'Temp'
+                temp = True
                 end_time = datetime.utcnow() + timedelta(minutes=-1)
                 start_time = end_time + timedelta(days=-days)
             elif type(start_time) == str:
                 start_time = datetime.fromisoformat(start_time)
                 end_time = datetime.fromisoformat(end_time)
+            
+            if temp:
+                self.SQLschema = self.SQLschema + 'Temp'
 
             if tables == None:
                 print('No tables introduced')
@@ -171,20 +174,13 @@ class API_Talkdesk:
         
         while not isValidResponse:
             response = requests.get(url.replace('files', 'jobs'), headers=headers).json()
-            try:
-                status = response['job']['status']
-            except:
-                status = 'created'
 
-            # print(status, sep='  ', end=' ', flush=True)
-            
-            if status == 'created':
+            if 'entries' in response.keys():
                 response = requests.get(url, headers=headers).json()
-                # time.sleep(0.5)
+
                 df_entries = pd.DataFrame(response['entries'])
                 df_entries = df_entries.loc[:, df_entries.columns != 'calls_historical_base.data_status'] #[['interaction_id', 'call_type', 'start_time', 'end_time','talkdesk_phone_number', 'customer_phone_number', 'talk_time', 'record','hangup', 'in_business_hours?', 'callback_from_queue?', 'waiting_time','agent_speed_to_answer', 'holding_time', 'rating', 'description','agent_name', 'phone_display_name', 'disposition_code', 'transfer?','handling_agent', 'tags', 'ivr_options', 'csat_score','csat_survey_time', 'team', 'rating_reason', 'agent_disconnected']]
                 df = df_entries.fillna('')
-                # print(df.columns)
                 
                 if self.API_domain == 'rootinsurance':
                     try:
@@ -194,17 +190,17 @@ class API_Talkdesk:
                             df['adherence_id'] = df['agent_name'] + ' ' + df['adherence_event_start_time'].astype(str)
                         if report_type == 'feedback_flow':
                             df.rename(columns= {'ring\xa0group': 'ring group'}, inplace=True)
-                        # print(df)
-                        # print(df.columns)
+
                     except KeyError as e:
                         print(response)
 
                 isValidResponse = True
             else:
+                print(response['job']['status'], sep='  ', end=' ', flush=True)
                 time.sleep(0.5)
         
         elapsedTime = time.time() - start_time
-        print(f'Time to get Data Report: {elapsedTime} Sec')
+        print(f'\nTime to get Data Report: {elapsedTime} Sec')
         return df
 
 
