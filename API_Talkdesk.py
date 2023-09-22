@@ -176,7 +176,12 @@ class API_Talkdesk:
             response = requests.get(url.replace('files', 'jobs'), headers=headers).json()
 
             if 'entries' in response.keys():
-                response = requests.get(url, headers=headers).json()
+
+                try:
+                    response = requests.get(url, headers=headers).json()
+                except:
+                    print('Error requesting... trying again.')
+                    time.sleep(1)
 
                 df_entries = pd.DataFrame(response['entries'])
                 df_entries = df_entries.loc[:, df_entries.columns != 'calls_historical_base.data_status'] #[['interaction_id', 'call_type', 'start_time', 'end_time','talkdesk_phone_number', 'customer_phone_number', 'talk_time', 'record','hangup', 'in_business_hours?', 'callback_from_queue?', 'waiting_time','agent_speed_to_answer', 'holding_time', 'rating', 'description','agent_name', 'phone_display_name', 'disposition_code', 'transfer?','handling_agent', 'tags', 'ivr_options', 'csat_score','csat_survey_time', 'team', 'rating_reason', 'agent_disconnected']]
@@ -196,8 +201,16 @@ class API_Talkdesk:
 
                 isValidResponse = True
             else:
-                print(response['job']['status'], sep='  ', end=' ', flush=True)
-                time.sleep(0.5)
+                try:
+                    print(response['job']['status'], sep='  ', end=' ', flush=True)
+                except:
+                    print(f'\nError getting Job status. Response: {response}')
+                    
+                    self.authorize()
+                    headers['Authorization'] = f"Bearer {self.access_token}"
+                    
+                    print('Authorized and running again...')
+                    time.sleep(0.5)
         
         elapsedTime = time.time() - start_time
         print(f'\nTime to get Data Report: {elapsedTime} Sec')
