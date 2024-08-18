@@ -19,7 +19,6 @@ class API_Kustomer:
         self.access_token = None
         self.access_token_startTime = None
         self.set_attributes()
-        
 
     def set_attributes(self):
         if self.API_domain == 'kustomer':
