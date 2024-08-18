@@ -68,7 +68,7 @@ class API_Talkdesk:
 
             if start_time == None:
                 temp = True
-                end_time = datetime.utcnow() + timedelta(minutes=-1)
+                end_time = datetime.utcnow() + timedelta(minutes=-60)
                 start_time = end_time + timedelta(days=-days)
             elif type(start_time) == str:
                 start_time = datetime.fromisoformat(start_time)
@@ -94,7 +94,7 @@ class API_Talkdesk:
                 aux_start_time = start_time
 
                 aux_time = start_time + timedelta(days=1)
-
+                
                 self.authorize()
                 
                 if 'Temp' in SQL_tables[i]:
@@ -102,7 +102,7 @@ class API_Talkdesk:
                     hours = -8
                 else:
                     hours = 0
-
+                
                 while aux_time <= end_time and aux_time <= now:
                     
                     self.authorize()
@@ -187,7 +187,7 @@ class API_Talkdesk:
                 df_entries = df_entries.loc[:, df_entries.columns != 'calls_historical_base.data_status'] #[['interaction_id', 'call_type', 'start_time', 'end_time','talkdesk_phone_number', 'customer_phone_number', 'talk_time', 'record','hangup', 'in_business_hours?', 'callback_from_queue?', 'waiting_time','agent_speed_to_answer', 'holding_time', 'rating', 'description','agent_name', 'phone_display_name', 'disposition_code', 'transfer?','handling_agent', 'tags', 'ivr_options', 'csat_score','csat_survey_time', 'team', 'rating_reason', 'agent_disconnected']]
                 df = df_entries.fillna('')
                 
-                if self.API_domain == 'rootinsurance':
+                if self.API_domain in ['rootinsurance', 'therabody']:
                     try:
                         if report_type == 'user_status':
                             df['user_status_id'] = df['user_id'] + ' ' + df['status_start_at'].astype(str)
